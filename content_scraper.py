@@ -93,7 +93,8 @@ if __name__ == "__main__":
 
     # scrape the last N pages
     new_data = []
-    for url in last_urls[5:6]:
+    # DO NOT FORGET TO CHANGE THIS!!!
+    for url in last_urls[0:5]:
         print(f"Parsing {url}")
         try:
             page_data = parse_page(url)
