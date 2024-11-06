@@ -13,19 +13,21 @@ URL_FILE = 'scraped_urls.json'  # File to store the list of URLs
 # regular expression pattern to match URLs with the required date format
 url_pattern = re.compile(r"^https://epthinktank\.eu/\d{4}/\d{2}/\d{2}/")
 
-# load the existing URLs from the file if it exists
 def load_existing_urls():
     if os.path.exists(URL_FILE) and os.path.getsize(URL_FILE) > 0:
         with open(URL_FILE, 'r') as file:
-            return json.load(file)
+            data = json.load(file)
+            return data.get("urls", [])
     return []
 
-# save the list of URLs to the file
-def save_urls(url_list):
+def save_urls(url_list, new_url_count):
+    data = {
+        "urls": url_list,
+        "new_url_count": new_url_count
+    }
     with open(URL_FILE, 'w') as file:
-        json.dump(url_list, file, indent=4)
+        json.dump(data, file, ensure_ascii=False, indent=4)
 
-# scrape blog post URLs from a single page
 def scrape_blog_urls(page_number):
     url = BASE_URL.format(page_number)
     response = requests.get(url)
@@ -66,7 +68,7 @@ if __name__ == "__main__":
         last_scraped_url = existing_urls[0]  # The first entry is the most recent URL
         print(f"Starting from the most recent URL: {last_scraped_url}")
     else:
-        last_scraped_url = None  # If no previous data, start scraping from the first page
+        last_scraped_url = None  # if no previous data, start scraping from the first page
 
     # set to store new URLs while preserving insertion order
     new_urls = []
@@ -93,11 +95,12 @@ if __name__ == "__main__":
             break
         
         page += 1
-        time.sleep(1)  # Delay to avoid overloading the server
+        time.sleep(1)  # delay to avoid overloading the server
 
     # combine old URLs with newly scraped ones, ensuring uniqueness
     all_urls = list(OrderedDict.fromkeys(new_urls + existing_urls))
+    new_url_count = len(new_urls)
 
-    # save the updated URLs to the file
-    save_urls(all_urls)
-    print(f"Collected newest URLs. Everything up to date. Total URLs: {len(all_urls)}")
+    # save the updated URLs and the count of new URLs to the file
+    save_urls(all_urls, new_url_count)
+    print(f"Collected newest URLs. Everything up to date. Total URLs: {len(all_urls)}. New URLs: {new_url_count}")
