@@ -5,10 +5,11 @@ import re
 import time
 import json
 import os
+from datetime import datetime
 
 # base URL for pagination
 BASE_URL = "https://epthinktank.eu/author/epanswers/page/{}"
-URL_FILE = 'scraped_urls.json'  # File to store the list of URLs
+URL_FILE = '/tmp/scraped_urls.json' #'scraped_urls.json'  # File to store the list of URLs
 
 # regular expression pattern to match URLs with the required date format
 url_pattern = re.compile(r"^https://epthinktank\.eu/\d{4}/\d{2}/\d{2}/")
@@ -60,6 +61,10 @@ def scrape_blog_urls(page_number):
         return False
 
 if __name__ == "__main__":
+    # Print the current date and time of execution
+    current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"Script execution date and time: {current_date}")
+
     # load previously scraped URLs
     existing_urls = load_existing_urls()
 
@@ -99,6 +104,7 @@ if __name__ == "__main__":
 
     # combine old URLs with newly scraped ones, ensuring uniqueness
     all_urls = list(OrderedDict.fromkeys(new_urls + existing_urls))
+    new_urls = list(OrderedDict.fromkeys(new_urls))
     new_url_count = len(new_urls)
 
     # save the updated URLs and the count of new URLs to the file
