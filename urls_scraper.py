@@ -9,28 +9,37 @@ from datetime import datetime
 
 # base URL for pagination
 BASE_URL = "https://epthinktank.eu/author/epanswers/page/{}"
-URL_FILE = '/tmp/scraped_urls.json' #'scraped_urls.json'  # File to store the list of URLs
+# get the directory of the current script
+script_dir = os.path.dirname(os.path.abspath(__file__))
+# combine it with the desired filename to get the full path
+URL_FILE = os.path.join(script_dir, 'scraped_urls.json') # file to store the scraped URLs
 
 # regular expression pattern to match URLs with the required date format
 url_pattern = re.compile(r"^https://epthinktank\.eu/\d{4}/\d{2}/\d{2}/")
 
 def load_existing_urls():
+    # Check if the file exists and load if non-empty
     if os.path.exists(URL_FILE) and os.path.getsize(URL_FILE) > 0:
+        print(f"[{datetime.now()}] Loading existing URLs from {URL_FILE}")
         with open(URL_FILE, 'r') as file:
             data = json.load(file)
             return data.get("urls", [])
+    print(f"[{datetime.now()}] No existing URLs found. Starting fresh.")
     return []
 
 def save_urls(url_list, new_url_count):
+    print(f"[{datetime.now()}] Saving URLs to {URL_FILE}. New URLs: {new_url_count}")
     data = {
         "urls": url_list,
         "new_url_count": new_url_count
     }
     with open(URL_FILE, 'w') as file:
         json.dump(data, file, ensure_ascii=False, indent=4)
+    print(f"[{datetime.now()}] URLs saved successfully to {URL_FILE}")
 
 def scrape_blog_urls(page_number):
     url = BASE_URL.format(page_number)
+    print(f"[{datetime.now()}] Requesting page {page_number} from {url}")
     response = requests.get(url)
     
     # check if the page exists
@@ -42,6 +51,7 @@ def scrape_blog_urls(page_number):
         
         # stop if no articles were found on the page
         if not article_divs:
+            print(f"[{datetime.now()}] No articles found on page {page_number}. Ending scraping.")
             return False
         
         # loop through each article div and search for nested <a> tags
@@ -55,15 +65,16 @@ def scrape_blog_urls(page_number):
                 if url_pattern.match(url):
                     new_urls.append(url)
         
+        print(f"[{datetime.now()}] Found {len(new_urls)} new URLs on page {page_number}")
         return new_urls
     else:
-        # return False if page does not exist (e.g., 404 error)
+        print(f"[{datetime.now()}] Page {page_number} not found (status code {response.status_code}). Ending scraping.")
         return False
 
 if __name__ == "__main__":
     # Print the current date and time of execution
     current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"Script execution date and time: {current_date}")
+    print(f"[{current_date}] Script execution started.")
 
     # load previously scraped URLs
     existing_urls = load_existing_urls()
@@ -71,9 +82,10 @@ if __name__ == "__main__":
     # if there are existing URLs, get the first one, which should be the most recent
     if existing_urls:
         last_scraped_url = existing_urls[0]  # The first entry is the most recent URL
-        print(f"Starting from the most recent URL: {last_scraped_url}")
+        print(f"[{datetime.now()}] Starting from the most recent URL: {last_scraped_url}")
     else:
         last_scraped_url = None  # if no previous data, start scraping from the first page
+        print(f"[{datetime.now()}] No last scraped URL. Starting fresh.")
 
     # set to store new URLs while preserving insertion order
     new_urls = []
@@ -81,14 +93,14 @@ if __name__ == "__main__":
     # scraping pages
     page = 1
     while True:
-        print(f"Scraping URLs from page {page}")
+        print(f"[{datetime.now()}] Scraping URLs from page {page}")
         
         # scrape URLs from the current page
         scraped_urls = scrape_blog_urls(page)
         
         # if no URLs found or invalid page, break the loop
         if not scraped_urls:
-            print("No more articles found or end of pages reached.")
+            print(f"[{datetime.now()}] Stopping scraping as no new URLs were found or end of pages reached.")
             break
         
         # add new URLs to the list
@@ -96,7 +108,7 @@ if __name__ == "__main__":
         
         # stop if we encounter the last scraped URL
         if last_scraped_url and last_scraped_url in scraped_urls:
-            print("Found the most recent article URL. Stopping scraping.")
+            print(f"[{datetime.now()}] Found the most recent article URL. Stopping scraping.")
             break
         
         page += 1
@@ -109,4 +121,5 @@ if __name__ == "__main__":
 
     # save the updated URLs and the count of new URLs to the file
     save_urls(all_urls, new_url_count)
-    print(f"Collected newest URLs. Everything up to date. Total URLs: {len(all_urls)}. New URLs: {new_url_count}")
+    print(f"[{datetime.now()}] Collected newest URLs. Everything up to date. Total URLs: {len(all_urls)}. New URLs: {new_url_count}")
+    print(f"[{datetime.now()}] Script execution finished.")
