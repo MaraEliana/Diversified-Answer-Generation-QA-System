@@ -8,7 +8,7 @@ import os
 from datetime import datetime
 import logging
 
-# Setup logging
+# setup logging
 script_dir = os.path.dirname(os.path.abspath(__file__))
 LOG_FILE = os.path.join(script_dir, 'url_scraper.log')
 logging.basicConfig(
@@ -54,25 +54,14 @@ def scrape_blog_urls(page_number):
     # check if the page exists
     if response.status_code == 200:
         soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # locate all div elements inside the specific container structure
-        article_divs = soup.select("body > div.c-black.f-text.main > div.container.section-latest.mt-3.mb-5.pb-5.section > div.row.infinite-scroll > div")
-        
-        # stop if no articles were found on the page
-        if not article_divs:
+        links = soup.find_all(href=re.compile(url_pattern))
+        if not links:
             logger.info(f"No articles found on page {page_number}. Ending scraping.")
             return False
         
-        # loop through each article div and search for nested <a> tags
-        new_urls = []
-        for article in article_divs:
-            links = article.find_all("a", href=True)
-            for link in links:
-                url = link['href']
-                
-                # check if the URL matches the pattern
-                if url_pattern.match(url):
-                    new_urls.append(url)
+        for link in links:
+            url = link['href']
+            new_urls.append(url)
         
         logger.info(f"Found {len(new_urls)} new URLs on page {page_number}")
         return new_urls
@@ -94,7 +83,7 @@ if __name__ == "__main__":
         last_scraped_url = None  # if no previous data, start scraping from the first page
         logger.info("No last scraped URL. Starting fresh.")
 
-    # set to store new URLs while preserving insertion order
+    # store new URLs while preserving insertion order
     new_urls = []
 
     # scraping pages
@@ -122,7 +111,7 @@ if __name__ == "__main__":
         time.sleep(1)  # delay to avoid overloading the server
 
     # combine old URLs with newly scraped ones, ensuring uniqueness
-    all_urls = list(OrderedDict.fromkeys(new_urls + existing_urls))
+    all_urls = list(OrderedDict.fromkeys(new_urls + existing_urls)) # preserves order, newer urls will be at the beginning
     new_urls = list(OrderedDict.fromkeys(new_urls))
     new_url_count = len(new_urls)
 
