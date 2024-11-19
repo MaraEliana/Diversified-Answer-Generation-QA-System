@@ -7,6 +7,8 @@ import json
 import os
 from datetime import datetime
 import logging
+from dotenv import load_dotenv
+from opensearch_utils import *
 
 # setup logging
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -26,26 +28,6 @@ URL_FILE = os.path.join(script_dir, 'scraped_urls.json')
 # regular expression pattern to match URLs with the required date format
 url_pattern = re.compile(r"^https://epthinktank\.eu/\d{4}/\d{2}/\d{2}/")
 
-def load_existing_urls():
-    # Check if the file exists and load if non-empty
-    if os.path.exists(URL_FILE) and os.path.getsize(URL_FILE) > 0:
-        logger.info(f"Loading existing URLs from {URL_FILE}")
-        with open(URL_FILE, 'r') as file:
-            data = json.load(file)
-            return data.get("urls", [])
-    logger.info("No existing URLs found. Starting fresh.")
-    return []
-
-def save_urls(url_list, new_url_count):
-    logger.info(f"Saving URLs to {URL_FILE}. New URLs: {new_url_count}")
-    data = {
-        "urls": url_list,
-        "new_url_count": new_url_count
-    }
-    with open(URL_FILE, 'w') as file:
-        json.dump(data, file, ensure_ascii=False, indent=4)
-    logger.info(f"URLs saved successfully to {URL_FILE}")
-
 def scrape_blog_urls(page_number):
     url = BASE_URL.format(page_number)
     logger.info(f"Requesting page {page_number} from {url}")
@@ -58,10 +40,13 @@ def scrape_blog_urls(page_number):
         if not links:
             logger.info(f"No articles found on page {page_number}. Ending scraping.")
             return False
-        
+        new_urls = []
         for link in links:
             url = link['href']
             new_urls.append(url)
+        
+        # Remove duplicates while preserving order
+        new_urls = list(dict.fromkeys(new_urls))
         
         logger.info(f"Found {len(new_urls)} new URLs on page {page_number}")
         return new_urls
@@ -71,24 +56,42 @@ def scrape_blog_urls(page_number):
 
 if __name__ == "__main__":
     logger.info("Script execution started.")
+    # load environment variables from the .env file
+    load_dotenv()
+    opensearch_user = os.getenv('OPENSEARCH_USER')
+    opensearch_password = os.getenv('OPENSEARCH_PASSWORD')
 
-    # load previously scraped URLs
-    existing_urls = load_existing_urls()
+    # create an OpenSearch client
+    logger.info("Creating OpenSearch client.")
+    opensearch_client = create_opensearch_client(username=opensearch_user, password=opensearch_password)
+    # create an index if it doesn't exist
+    index_name = "eur-lex-diversified-urls-askep"
+    # delete this
+    # response = opensearch_client.indices.delete(index=index_name, ignore=[400, 404])
+    mapping = {
+                "mappings": {
+                    "properties": {
+                        "url": {"type": "keyword"},
+                        "date": {"type": "date"}
+                    }
+                }
+            }
+    create_index(opensearch_client, index_name, mapping, logger)
 
-    # if there are existing URLs, get the first one, which should be the most recent
-    if existing_urls:
-        last_scraped_url = existing_urls[0]  # the first entry is the most recent URL
-        logger.info(f"Starting from the most recent URL: {last_scraped_url}")
+    # get the latest date from the index
+    latest_date = get_latest_date(opensearch_client, index_name, logger)
+    if latest_date:
+        # get the URLs corresponding to the latest date
+        latest_urls = get_urls_by_date(opensearch_client, index_name, latest_date, logger)
     else:
-        last_scraped_url = None  # if no previous data, start scraping from the first page
-        logger.info("No last scraped URL. Starting fresh.")
-
-    # store new URLs while preserving insertion order
-    new_urls = []
-
+        logger.info("No latest date found in the index.")
+        latest_urls = []
+        
     # scraping pages
     page = 1
-    while True:
+    stop_scraping = False
+
+    while not stop_scraping:
         logger.info(f"Scraping URLs from page {page}")
         
         # scrape URLs from the current page
@@ -99,23 +102,16 @@ if __name__ == "__main__":
             logger.info("Stopping scraping as no new URLs were found or end of pages reached.")
             break
         
-        # add new URLs to the list
-        new_urls.extend(scraped_urls)
-        
-        # stop if we encounter the last scraped URL
-        if last_scraped_url and last_scraped_url in scraped_urls:
-            logger.info("Found the most recent article URL. Stopping scraping.")
-            break
-        
+        for url in scraped_urls:
+            if latest_urls and url in latest_urls:
+                logger.info("Found the most recent article URL. Stopping scraping.")
+                stop_scraping = True
+                break
+            else:
+                # add the new url to the opensearch index
+                logger.info(f"Adding URL '{url}' to the index.")
+                add_url_with_date(opensearch_client, index_name, url, logger)
+    
         page += 1
-        time.sleep(1)  # delay to avoid overloading the server
-
-    # combine old URLs with newly scraped ones, ensuring uniqueness
-    all_urls = list(OrderedDict.fromkeys(new_urls + existing_urls)) # preserves order, newer urls will be at the beginning
-    new_urls = list(OrderedDict.fromkeys(new_urls))
-    new_url_count = len(new_urls)
-
-    # save the updated URLs and the count of new URLs to the file
-    save_urls(all_urls, new_url_count)
-    logger.info(f"Collected newest URLs. Everything up to date. Total URLs: {len(all_urls)}. New URLs: {new_url_count}")
+        time.sleep(1)
     logger.info("Script execution finished.")
