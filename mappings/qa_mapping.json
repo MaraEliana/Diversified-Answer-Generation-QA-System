@@ -1,0 +1,59 @@
+{
+    "mappings": {
+        "properties": {
+        "html": {
+            "type": "text"
+        },
+        "url": {
+            "type": "keyword"
+        },
+        "date": {
+            "type": "date"
+        },
+        "title": {
+            "type": "text",
+            "fields": {
+            "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+            }
+            }
+        },
+        "question": {
+            "type": "text",
+            "fields": {
+            "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+            }
+            }
+        },
+        "answer": {
+            "type": "nested",
+            "properties": {
+            "section_title": {
+                "type": "text",
+                "fields": {
+                "keyword": {
+                    "type": "keyword",
+                    "ignore_above": 256
+                }
+                }
+            },
+            "section_content": {
+                "type": "text"
+            }
+            }
+        },
+        "links": {
+            "type": "keyword"
+        },
+        "tags": {
+            "type": "keyword"
+        },
+        "tag_urls": {
+            "type": "keyword"
+        }
+        }
+    }
+}

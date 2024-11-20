@@ -1,0 +1,8 @@
+{
+    "mappings": {
+        "properties": {
+            "url": {"type": "keyword"},
+            "date": {"type": "date"}
+        } 
+    }
+}

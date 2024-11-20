@@ -1,9 +1,26 @@
 import re
+import json
 from datetime import date, timedelta
 from opensearchpy import OpenSearch
 from opensearchpy.exceptions import NotFoundError
 
+def load_mapping(file_path):
+    """
+    Import a mapping of an OpenSearch index from a JSON file.
+    :param file_path: Path to the JSON file.
+    """
+    with open(file_path, 'r') as f:
+        return json.load(f)
+
 def create_opensearch_client(host='opensearch-ds-2.ifi.uni-heidelberg.de', port=443, username=None, password=None):
+    """
+    Create an OpenSearch client.
+    :param host: Hostname of the OpenSearch server.
+    :param port: Port number of the OpenSearch server.
+    :param username: Username for authentication.
+    :param password: Password for authentication.
+    :return: OpenSearch client object.
+    """
     auth = (username, password) if username and password else None
     client = OpenSearch(
         hosts=[{'host': host, 'port': port}],
@@ -19,17 +36,41 @@ def index_exists(client, index_name):
     return client.indices.exists(index=index_name)
 
 def create_index(client, index_name, mapping, logger=None):
+    """
+    Create an index in OpenSearch if it doesn't already exist.
+    :param client: OpenSearch client.
+    :param index_name: Name of the index.
+    :param mapping: Mapping definition for the index.
+    :param field_limit: Field limit for the index (default: 10000).
+    :param logger: Optional logger object.
+    """
+    field_limit = 100000
+    # Add the field limit setting to the mapping
+    settings = {
+        "settings": {
+            "index.mapping.total_fields.limit": field_limit
+        }
+    }
+
+    # merge settings and mappings
+    index_body = {**settings, **mapping}
+
+    # check if the index exists
     if not index_exists(client, index_name):
-        logger.info(f"Creating index '{index_name}'...")
-        client.indices.create(index=index_name, body=mapping)
-        logger.info(f"Index '{index_name}' created.")
+        logger.info(f"Creating index '{index_name}' with a field limit of {field_limit}...")
+        client.indices.create(index=index_name, body=index_body)
+        logger.info(f"Index '{index_name}' created with a field limit of {field_limit}.")
     else:
         logger.info(f"Index '{index_name}' already exists.")
+
 
 def extract_date_from_url(url, logger):
     """
     Extract a date from the URL in YYYY/MM/DD format.
     Example: https://epthinktank.eu/2024/10/24/... -> 2024-10-24
+    :param url: URL string.
+    :param logger: Logger object.
+    :return: Date object if found, otherwise None.
     """
     match = re.search(r'/(\d{4})/(\d{2})/(\d{2})/', url)
     if match:
@@ -42,6 +83,10 @@ def extract_date_from_url(url, logger):
 def add_url_with_date(client, index_name, url, logger=None):
     """
     Add a URL to the index using its extracted date as the date field.
+    :param client: OpenSearch client.
+    :param index_name: Name of the index.
+    :param url: URL string.
+    :param logger: Optional logger object.
     """
     extracted_date = extract_date_from_url(url, logger)
     if extracted_date:
@@ -116,3 +161,4 @@ def get_urls_by_date(client, index_name, target_date, logger=None):
     except NotFoundError:
         logger.info(f"Index '{index_name}' does not exist.")
         return []
+    
