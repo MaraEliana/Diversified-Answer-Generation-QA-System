@@ -4,6 +4,7 @@ import json
 import os
 import logging
 import requests
+import unicodedata
 from bs4 import BeautifulSoup
 from lxml import html
 from dotenv import load_dotenv
@@ -25,6 +26,11 @@ BASE_URL = "https://epthinktank.eu/author/epanswers/page/{}"
 
 # regular expression pattern to match URLs with the required date format
 url_pattern = re.compile(r"^https://epthinktank\.eu/\d{4}/\d{2}/\d{2}/")
+
+def normalize_text(text):
+    # This function will normalize the text (e.g., remove unnecessary spaces, special characters, etc.)
+    return ' '.join(text.split())
+
 
 def scrape_blog_urls(page_number):
     url = BASE_URL.format(page_number)
@@ -108,82 +114,103 @@ def parse_page(url, logger):
     :param logger: Logger object for logging messages.
     :return: Dictionary containing the extracted data.
     """
-
-    response = requests.get(url)
-    response.raise_for_status()
-    tree = html.fromstring(response.content)
     
-    # extract date
-    date = extract_date_from_url(url, logger)
+    # Get the page content
+    response = requests.get(url)
+    response.encoding = response.apparent_encoding or 'utf-8'
+    response.raise_for_status()
+    
+    # Use BeautifulSoup to parse the HTML
+    soup = BeautifulSoup(response.content, 'html.parser')
 
-    # extract title
-    title_xpath = '/html/body/div[5]/article/header/div[2]/div/div/div/h1'
-    title = tree.xpath(title_xpath)
-    title_text = title[0].text_content().strip() if title else "No title found"
+    # Extract the title (from the <title> tag)
+    title_text = normalize_text(soup.title.string.strip() if soup.title else "No title found")
     if title_text == "No title found":
         logger.warning("Title not found")
 
-    # target the content div
+    # Extract the content div using lxml for precise XPath targeting
+    tree = html.fromstring(response.content.decode('utf-8', errors='replace'))
     content_xpath = '/html/body/div[5]/article/div/div/div[1]/div[3]'
     content_div = tree.xpath(content_xpath)
     if not content_div:
         logger.warning("Content div not found")
     content_div = content_div[0]
 
-    # extract the question field (first paragraph in content_div)
-    first_paragraph = content_div.xpath(".//p[1]")
-    question = first_paragraph[0].text_content().strip() if first_paragraph else "No introductory paragraph found."
+    # Extract the question field (first paragraph in content div, using the provided XPath)
+    question_xpath = '/html/body/div[5]/article/div/div/div[1]/div[1]/p'
+    question_paragraph = tree.xpath(question_xpath)
+    question = normalize_text(question_paragraph[0].text_content().strip() if question_paragraph else "No introductory paragraph found.")
     if question == "No introductory paragraph found.":
         logger.warning("Question not found")
 
-    # extract all section titles (h2, h3, strong)
+    # Extract all section titles (h2, h3, strong)
     section_titles = content_div.xpath(".//h2 | .//h3 | .//strong")
 
-    # create the answer as a dictionary
+    # Create the answer as a dictionary
     answer = {}
-    
-    # iterate through the section titles
-    for i, section_title in enumerate(section_titles):
-        title_text = section_title.text_content().strip()
+
+    # Gather paragraphs before the first section title
+    pre_title_paragraphs = []
+    first_section_found = False
+
+    # Iterate over all elements in content_div, including paragraphs, h2, h3, strong, etc.
+    for element in content_div.iter():  # iter() iterates over all child elements of content_div
+        # Check if the element is a paragraph <p> tag
+        if element.tag == 'p' and not first_section_found:
+            # Add the paragraph text to the pre_title_paragraphs list
+            pre_title_paragraphs.append(normalize_text(element.text_content().strip()))
         
-        # get the start of the current section
-        start_element = section_title.getnext()
+        # If the element is a section title (h2, h3, strong), stop accumulating paragraphs
+        if element.tag in ['h2', 'h3', 'strong'] and not first_section_found:
+            first_section_found = True
+
+    # Add the article title as the first key in the answer dictionary with the collected paragraphs
+    answer[title_text] = " ".join(pre_title_paragraphs)
+
+   # Iterate over all elements in content_div, including paragraphs, h2, h3, strong, etc.
+    section_content = []
+    current_title = title_text  # Title of the article for the first section
+
+    # Traverse all elements inside content_div
+    for element in content_div.iter():
+        # If the element is a section title (h2, h3, or strong), this marks the start of a new section
+        if element.tag in ['h2', 'h3', 'strong']:
+            # If we're already collecting content for a section, store the content for the previous section
+            if section_content:
+                answer[current_title] = " ".join(section_content)
+            
+            # Set the new section title as the current title
+            section_title_text = normalize_text(element.text_content().strip())
+            current_title = section_title_text if section_title_text else current_title
+
+            # Reset the section content to start collecting content for the new section
+            section_content = []
         
-        # determine the end of the current section
-        if i + 1 < len(section_titles):
-            # there is a next section title
-            end_element = section_titles[i + 1]
-        else:
-            # this is the last section, include everything until the end of the div
-            end_element = None
+        # If the element is a paragraph or list, add its content to the current section's content
+        elif element.tag in ['p', 'ul', 'ol']:
+            section_content.append(normalize_text(element.text_content().strip()))
 
-        # collect all content between the current and next title
-        section_content = []
-        while start_element is not None and start_element != end_element:
-            if start_element.tag in ['p', 'ul', 'ol']:
-                section_content.append(start_element.text_content().strip())
-            start_element = start_element.getnext()
+    # After the loop, make sure to store the last section's content
+    if section_content:
+        answer[current_title] = " ".join(section_content)
 
-        # join the section content and store it
-        answer[title_text] = " ".join(section_content)
-
-    # extract links from the content
+    # Extract links from the content
     links = [a.get("href") for a in content_div.xpath(".//p//a[@href]")]
     
-    # extract tags and their URLs from the specified tags section
+    # Extract tags and their URLs from the specified tags section
     tags_xpath = '/html/body/div[5]/article/div/div/div[1]/div[5]'
     tags_div = tree.xpath(tags_xpath)
     if tags_div:
-        tags = [tag.text_content().strip() for tag in tags_div[0].xpath(".//a[@rel='tag']")]
+        tags = [normalize_text(tag.text_content().strip()) for tag in tags_div[0].xpath(".//a[@rel='tag']")]
         tag_urls = [tag.get("href") for tag in tags_div[0].xpath(".//a[@rel='tag']")]
     else:
         tags, tag_urls = [], []
 
+    # Return the extracted page data
     page_data = {
         "html": response.text,
         "url": url,
-        "date": date,
-        "title": title_text,
+        "date": extract_date_from_url(url, logger).strftime('%Y-%m-%d'), 
         "question": question,
         "answer": answer,
         "links": links,
@@ -201,6 +228,7 @@ def save_page_data(client, index_name, urls_list, logger=None):
     :param urls_list: List of URLs to parse and save.
     :param logger: Optional logger object.
     """
+    keys_to_extract = ["html", "url", "date", "title", "question", "answer", "links", "tags", "tag_urls"]
     unindexed_pages = []
     for i, url in enumerate(urls_list):
         try:
@@ -210,10 +238,10 @@ def save_page_data(client, index_name, urls_list, logger=None):
             client.index(index=index_name, body=page_data)
         except Exception as e:
             logger.error(f"Error processing URL '{url}': {e}")
-            unindexed_pages.append(page_data)
-    # buggy at the moment, unaccepted date type
-    # with open("unindexed_pages.json", "w") as f:
-    #     json.dump(unindexed_pages, f)
+            res = dict(filter(lambda item: item[0] in keys_to_extract, page_data.items()))
+            unindexed_pages.append(res)
+    with open("unindexed_pages.json", "w", encoding='utf-8') as f:
+        json.dump(unindexed_pages, f, ensure_ascii=False, indent=4)
     logger.info(f"Saved {len(urls_list)} pages to index '{index_name}'.")
 
 if __name__ == "__main__":
@@ -237,6 +265,7 @@ if __name__ == "__main__":
 
     # extract the new URLs
     new_urls = extract_new_urls(opensearch_client, url_index, logger)
+
     if new_urls:
         # save the new URLs to the QA index in OpenSearch
         qa_index = "eur-lex-diversified-qa-askep"
@@ -246,7 +275,6 @@ if __name__ == "__main__":
         qa_mapping = load_mapping("./mappings/qa_mapping.json")
         # create the QA index if it doesn't exist
         create_index(opensearch_client, qa_index, qa_mapping, logger)
-
         # parse the new URLs and save the structured data to the QA index
         save_page_data(opensearch_client, qa_index, new_urls, logger)
     else:

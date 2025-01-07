@@ -8,3 +8,15 @@
 ## Next Tasks:
 - change the structure of the stored information from each content (there is not a 1-to-1 correspondence between section titles and section texts)
 - add the possibility to store the scraped content directly in an OpenSearch index.
+
+
+PROBLEMS:
+- 
+- languages
+- strong tag was not detected (look at page_3.json)
+
+NOTES FOR SCRAPING EXTERNAL DOCS:
+- Some of them are links to EUR-Lex pages and those contains links to simplified versions with the same content. Would be very helpful.
+- Use MarkItDown.
+- Beware of the PDFs.
+- First do not take care of text hierarchy.[- ]

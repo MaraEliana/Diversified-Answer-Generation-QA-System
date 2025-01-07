@@ -11,39 +11,13 @@
             "type": "date"
         },
         "title": {
-            "type": "text",
-            "fields": {
-            "keyword": {
-                "type": "keyword",
-                "ignore_above": 256
-            }
-            }
+            "type": "text"
         },
         "question": {
-            "type": "text",
-            "fields": {
-            "keyword": {
-                "type": "keyword",
-                "ignore_above": 256
-            }
-            }
+            "type": "text"
         },
         "answer": {
-            "type": "nested",
-            "properties": {
-            "section_title": {
-                "type": "text",
-                "fields": {
-                "keyword": {
-                    "type": "keyword",
-                    "ignore_above": 256
-                }
-                }
-            },
-            "section_content": {
-                "type": "text"
-            }
-            }
+            "type": "object"
         },
         "links": {
             "type": "keyword"
