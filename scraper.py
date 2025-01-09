@@ -228,20 +228,21 @@ def save_page_data(client, index_name, urls_list, logger=None):
     :param urls_list: List of URLs to parse and save.
     :param logger: Optional logger object.
     """
-    keys_to_extract = ["html", "url", "date", "title", "question", "answer", "links", "tags", "tag_urls"]
-    unindexed_pages = []
+    keys_to_extract = ["links"]
+    external_urls = []
     for i, url in enumerate(urls_list):
+        logger.info(f"Parsing page: {url}")
+        page_data = parse_page(url, logger)
         try:
-            logger.info(f"Parsing page: {url}")
-            page_data = parse_page(url, logger)
             logger.info(f"Saving data to index: {index_name}")
             client.index(index=index_name, body=page_data)
         except Exception as e:
             logger.error(f"Error processing URL '{url}': {e}")
-            res = dict(filter(lambda item: item[0] in keys_to_extract, page_data.items()))
-            unindexed_pages.append(res)
-    with open("unindexed_pages.json", "w", encoding='utf-8') as f:
-        json.dump(unindexed_pages, f, ensure_ascii=False, indent=4)
+        res = dict(filter(lambda item: item[0] in keys_to_extract, page_data.items()))
+        external_urls.append(res)
+    logger.info(f"Saving {len(external_urls)} external URLs to 'external_urls.json'.")
+    with open("external_urls.json", "w", encoding='utf-8') as f:
+        json.dump(external_urls, f, ensure_ascii=False, indent=4)
     logger.info(f"Saved {len(urls_list)} pages to index '{index_name}'.")
 
 if __name__ == "__main__":
@@ -257,9 +258,6 @@ if __name__ == "__main__":
 
     # create an index for the list of urls if it doesn't exist
     url_index = "eur-lex-diversified-urls-askep"
-    ##### DELETE INDEX
-    # opensearch_client.indices.delete(index=url_index, ignore=[400, 404])
-    ##### 
     url_mapping = load_mapping("./mappings/urls_mapping.json")
     create_index(opensearch_client, url_index, url_mapping, logger)
 
@@ -269,9 +267,6 @@ if __name__ == "__main__":
     if new_urls:
         # save the new URLs to the QA index in OpenSearch
         qa_index = "eur-lex-diversified-qa-askep"
-        ##### DELETE INDEX
-        # opensearch_client.indices.delete(index=qa_index, ignore=[400, 404])
-        #####
         qa_mapping = load_mapping("./mappings/qa_mapping.json")
         # create the QA index if it doesn't exist
         create_index(opensearch_client, qa_index, qa_mapping, logger)

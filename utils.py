@@ -48,9 +48,13 @@ def create_index(client, index_name, mapping, logger=None):
     # Add the field limit setting to the mapping
     settings = {
         "settings": {
-            "index.mapping.total_fields.limit": field_limit
+            "index": {
+                "knn": True,  # Enable kNN for vector search
+                "mapping.total_fields.limit": field_limit  # Adjust the field limit (e.g., 1000)
+            }
         }
     }
+
 
     # merge settings and mappings
     index_body = {**settings, **mapping}
