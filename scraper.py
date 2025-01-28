@@ -5,10 +5,15 @@ import os
 import logging
 import requests
 import unicodedata
+from openai import OpenAI
+from langdetect import detect
 from bs4 import BeautifulSoup
 from lxml import html
 from dotenv import load_dotenv
 from utils import *
+
+# load environment variables from the .env file
+load_dotenv()
 
 # setup logging
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -106,6 +111,9 @@ def extract_new_urls(client, index_name, logger=None):
     return new_urls
 
 
+def decide_question(title, paragraph):
+    pass
+
 def parse_page(url, logger):
     """
     Parse a webpage and extract structured content.
@@ -137,55 +145,39 @@ def parse_page(url, logger):
     content_div = content_div[0]
 
     # Extract the question field (first paragraph in content div, using the provided XPath)
-    question_xpath = '/html/body/div[5]/article/div/div/div[1]/div[1]/p'
-    question_paragraph = tree.xpath(question_xpath)
-    question = normalize_text(question_paragraph[0].text_content().strip() if question_paragraph else "No introductory paragraph found.")
-    if question == "No introductory paragraph found.":
-        logger.warning("Question not found")
+    first_paragraph_xpath = '/html/body/div[5]/article/div/div/div[1]/div[1]/p'
+    first_paragraph = tree.xpath(first_paragraph_xpath)
+    first_paragraph = normalize_text(first_paragraph[0].text_content().strip() if first_paragraph else "No introductory paragraph found.")
+    # NEXT TO CHANGE
+    # decision = decide_question(title_text, first_paragraph)
+    # if decision == "title":
+    #     logger.info("Title chosen as the question")
+    #     question = title_text
+    # else:
+    #     logger.info("Paragraph chosen as the question")
+    #     question = first_paragraph
+    question = first_paragraph
 
     # Extract all section titles (h2, h3, strong)
-    section_titles = content_div.xpath(".//h2 | .//h3 | .//strong")
+    section_titles = content_div.xpath(".//h2 | .//h3")
 
     # Create the answer as a dictionary
     answer = {}
 
-    # Gather paragraphs before the first section title
-    pre_title_paragraphs = []
-    first_section_found = False
+    current_title = title_text
+    section_content = []
 
     # Iterate over all elements in content_div, including paragraphs, h2, h3, strong, etc.
     for element in content_div.iter():  # iter() iterates over all child elements of content_div
-        # Check if the element is a paragraph <p> tag
-        if element.tag == 'p' and not first_section_found:
-            # Add the paragraph text to the pre_title_paragraphs list
-            pre_title_paragraphs.append(normalize_text(element.text_content().strip()))
-        
-        # If the element is a section title (h2, h3, strong), stop accumulating paragraphs
-        if element.tag in ['h2', 'h3', 'strong'] and not first_section_found:
-            first_section_found = True
-
-    # Add the article title as the first key in the answer dictionary with the collected paragraphs
-    answer[title_text] = " ".join(pre_title_paragraphs)
-
-   # Iterate over all elements in content_div, including paragraphs, h2, h3, strong, etc.
-    section_content = []
-    current_title = title_text  # Title of the article for the first section
-
-    # Traverse all elements inside content_div
-    for element in content_div.iter():
         # If the element is a section title (h2, h3, or strong), this marks the start of a new section
-        if element.tag in ['h2', 'h3', 'strong']:
+        if element.tag in ['h2', 'h3']:
             # If we're already collecting content for a section, store the content for the previous section
             if section_content:
                 answer[current_title] = " ".join(section_content)
-            
             # Set the new section title as the current title
-            section_title_text = normalize_text(element.text_content().strip())
-            current_title = section_title_text if section_title_text else current_title
-
+            current_title = normalize_text(element.text_content().strip())
             # Reset the section content to start collecting content for the new section
             section_content = []
-        
         # If the element is a paragraph or list, add its content to the current section's content
         elif element.tag in ['p', 'ul', 'ol']:
             section_content.append(normalize_text(element.text_content().strip()))
@@ -193,6 +185,13 @@ def parse_page(url, logger):
     # After the loop, make sure to store the last section's content
     if section_content:
         answer[current_title] = " ".join(section_content)
+
+    # Iterate over the answer keys and remove key-value pairs which are not in English
+    multilingual = False
+    for key in list(answer.keys()):
+        if detect(answer[key]) != "en":
+            multilingual = True
+            del answer[key]
 
     # Extract links from the content
     links = [a.get("href") for a in content_div.xpath(".//p//a[@href]")]
@@ -207,12 +206,14 @@ def parse_page(url, logger):
         tags, tag_urls = [], []
 
     # Return the extracted page data
+    # change the multiple_languages field
     page_data = {
         "html": response.text,
         "url": url,
         "date": extract_date_from_url(url, logger).strftime('%Y-%m-%d'), 
         "question": question,
         "answer": answer,
+        "multiple_languages": multilingual,
         "links": links,
         "tags": tags,
         "tag_urls": tag_urls
@@ -228,30 +229,32 @@ def save_page_data(client, index_name, urls_list, logger=None):
     :param urls_list: List of URLs to parse and save.
     :param logger: Optional logger object.
     """
-    keys_to_extract = ["links"]
-    external_urls = []
+    keys_to_extract = ["url", "date", "question", "answer", "multiple_languages", "links", "tags", "tag_urls"]
+    problematic_urls = []
+    # save each page to a .json file
     for i, url in enumerate(urls_list):
         logger.info(f"Parsing page: {url}")
         page_data = parse_page(url, logger)
+        res = dict(filter(lambda item: item[0] in keys_to_extract, page_data.items()))
+        # set the url to be the unique identifier for the document
+        custom_id = url
+        with open(f"pages/page_{i}.json", "w", encoding='utf-8') as f:
+            json.dump(res, f, ensure_ascii=False, indent=4)
         try:
             logger.info(f"Saving data to index: {index_name}")
-            client.index(index=index_name, body=page_data)
+            client.index(index=index_name, body=page_data, id=custom_id)
         except Exception as e:
-            logger.error(f"Error processing URL '{url}': {e}")
-        res = dict(filter(lambda item: item[0] in keys_to_extract, page_data.items()))
-        external_urls.append(res)
-    logger.info(f"Saving {len(external_urls)} external URLs to 'external_urls.json'.")
-    with open("external_urls.json", "w", encoding='utf-8') as f:
-        json.dump(external_urls, f, ensure_ascii=False, indent=4)
+            logger.error(f"Error processing URL {i} with '{url}': {e}")
+            problematic_urls.append(res)
+    logger.info(f"Saving {len(problematic_urls)} external URLs to 'problematic_urls.json'.")
+    with open("problematic_urls.json", "w", encoding='utf-8') as f:
+        json.dump(problematic_urls, f, ensure_ascii=False, indent=4)
     logger.info(f"Saved {len(urls_list)} pages to index '{index_name}'.")
 
 if __name__ == "__main__":
     logger.info("Script execution started.")
-    # load environment variables from the .env file
-    load_dotenv()
     opensearch_user = os.getenv('OPENSEARCH_USER')
     opensearch_password = os.getenv('OPENSEARCH_PASSWORD')
-
     # create an OpenSearch client
     logger.info("Creating OpenSearch client.")
     opensearch_client = create_opensearch_client(username=opensearch_user, password=opensearch_password)
@@ -259,6 +262,9 @@ if __name__ == "__main__":
     # create an index for the list of urls if it doesn't exist
     url_index = "eur-lex-diversified-urls-askep"
     url_mapping = load_mapping("./mappings/urls_mapping.json")
+    ### DELETE THIS
+    opensearch_client.indices.delete(index=url_index)
+    ###
     create_index(opensearch_client, url_index, url_mapping, logger)
 
     # extract the new URLs
@@ -268,6 +274,9 @@ if __name__ == "__main__":
         # save the new URLs to the QA index in OpenSearch
         qa_index = "eur-lex-diversified-qa-askep"
         qa_mapping = load_mapping("./mappings/qa_mapping.json")
+        ### DELETE THIS
+        opensearch_client.indices.delete(index=qa_index)
+        ###
         # create the QA index if it doesn't exist
         create_index(opensearch_client, qa_index, qa_mapping, logger)
         # parse the new URLs and save the structured data to the QA index

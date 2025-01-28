@@ -17,7 +17,11 @@
             "type": "text"
         },
         "answer": {
-            "type": "object"
+            "type": "object",
+            "enabled": true
+        },
+        "multiple_languages": {
+            "type": "boolean"
         },
         "links": {
             "type": "keyword"
