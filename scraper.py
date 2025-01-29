@@ -111,8 +111,23 @@ def extract_new_urls(client, index_name, logger=None):
     return new_urls
 
 
-def decide_question(title, paragraph):
-    pass
+def decide_question(title, paragraph, logger):
+    client = OpenAI(api_key=os.environ['OPENAI_API_KEY'])
+    prompt = (
+        "I have a title and a paragraph. Assess which is better suited as a question.\n"
+        f"Title: '{title}'\n"
+        f"Paragraph: '{paragraph}'\n"
+        "Respond with 'title' or 'paragraph' depending on which you think is better. Please limit your response to exactly one of those words."
+    )
+
+    try:
+        completion = client.chat.completions.create(model="gpt-4", messages=[{"role": "user", "content": prompt}])
+        logger.info(f"OpenAI response: {completion.choices[0].message.content}")
+        return completion.choices[0].message.content
+
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        return None
 
 def parse_page(url, logger):
     """
@@ -148,15 +163,14 @@ def parse_page(url, logger):
     first_paragraph_xpath = '/html/body/div[5]/article/div/div/div[1]/div[1]/p'
     first_paragraph = tree.xpath(first_paragraph_xpath)
     first_paragraph = normalize_text(first_paragraph[0].text_content().strip() if first_paragraph else "No introductory paragraph found.")
-    # NEXT TO CHANGE
-    # decision = decide_question(title_text, first_paragraph)
-    # if decision == "title":
-    #     logger.info("Title chosen as the question")
-    #     question = title_text
-    # else:
-    #     logger.info("Paragraph chosen as the question")
-    #     question = first_paragraph
-    question = first_paragraph
+    decision = decide_question(title_text, first_paragraph, logger)
+    if decision == 'title':
+        logger.info("Title chosen as the question")
+        question = title_text
+    else:
+        logger.info("Paragraph chosen as the question")
+        question = first_paragraph
+
 
     # Extract all section titles (h2, h3, strong)
     section_titles = content_div.xpath(".//h2 | .//h3")

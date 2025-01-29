@@ -6,11 +6,11 @@
     - Added a field for marking that the same content is present in multiple languages.
     - All web pages can be indexed now. The problem with the 23 documents was automatically solved after changing the code.
     - Removed non-English content.
+    - Used LLM to decide if the title or the first paragraph should be the question.
 
 
 ## Pending Taks:
 - QA index:
-    - Take as question the title or the first paragraph.
     - Take the answer and ask an LLM to formulate a question for it and store this question in a separate field.
     - Compute text analytics.
 - Knowledge base:
