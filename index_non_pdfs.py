@@ -9,6 +9,9 @@ from dotenv import load_dotenv
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from opensearchpy import OpenSearch
 from utils import create_opensearch_client, create_index
+import asyncio
+from crawl4ai import AsyncWebCrawler
+from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig, CacheMode
 
 # config files
 CONFIG_FILE = "configurations.json"
@@ -63,6 +66,29 @@ def scrape_text(url):
     except requests.exceptions.RequestException as e:
         logger.error(f"Error scraping URL {url}: {e}")
         return None
+    
+async def scrape_text_with_crawl4ai(url):
+    browser_config = BrowserConfig(verbose=True)
+    run_config = CrawlerRunConfig(
+        # Content filtering
+        excluded_tags=['form', 'header'],
+        exclude_external_links=True,
+
+        # Content processing
+        process_iframes=True,
+        remove_overlay_elements=True
+    )
+
+    async with AsyncWebCrawler(config=browser_config) as crawler:
+            result = await crawler.arun(
+                url=url,
+                config=run_config
+            )
+            if result.success:
+                return result.markdown
+            else:
+                logger.error(f"Crawl failed: {result.error_message}")
+                return None
 
 # split text using LangChain
 def split_text_with_langchain(text, text_splitter):
@@ -85,6 +111,9 @@ def embed_text_with_ollama(embedding_model, chunks):
             embeddings.append(None)
     return embeddings
 
+def embed_text_with_openai(chunks):
+    pass
+
 # index embeddings in OpenSearch
 def index_embeddings(index_name, chunks, embeddings, url):
     """
@@ -95,7 +124,7 @@ def index_embeddings(index_name, chunks, embeddings, url):
     :param url: URL of the page.
     :return: List of unindexed chunks with corresponding chunk_id and url.
     """
-    unindexed_chunks = []
+    has_unindexed_chunks = False
     logger.info(f"Indexing embeddings for URL: {url}.")
     for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
         if embedding:
@@ -105,12 +134,12 @@ def index_embeddings(index_name, chunks, embeddings, url):
                 "text": chunk,
                 "embedding": embedding
             }
-            opensearch_client.index(index=index_name, body=document)
+            opensearch_client.index(index=index_name, body=document, id=f"{url}_{i}")
             logger.debug(f"Indexed chunk {i} for URL: {url}")
         else:
             logger.warning(f"Skipping chunk {i} for URL: {url} due to missing embedding")
-            unindexed_chunks.append({"url": url, "chunk_id": i, "text": chunk})
-    return unindexed_chunks
+            has_unindexed_chunks = True
+    return has_unindexed_chunks
 
 
 # read URLs from the JSON file
@@ -126,22 +155,26 @@ def read_urls_from_file(file_path):
         return []
 
 def process_urls(index_name, urls, text_splitter, embedding_model):
-    unindexed_chunks_list = []
+    urls_unindexed_chunks = []
     unindexed_chunks_file = "unindexed_chunks.json"
     for url in tqdm(urls):
         logger.info(f"Processing URL: {url}")
-        text = scrape_text(url)
+        # basic scraping
+        # text = scrape_text(url)
+        # advanced scraping with crawl4ai
+        text = asyncio.run(scrape_text_with_crawl4ai(url))
         if text:
             chunks = split_text_with_langchain(text, text_splitter)
             embeddings = embed_text_with_ollama(embedding_model, chunks)
-            unindexed_chunks = index_embeddings(index_name, chunks, embeddings, url)
-            unindexed_chunks_list.extend(unindexed_chunks)
+            has_unindexed_chunks = index_embeddings(index_name, chunks, embeddings, url)
+            if has_unindexed_chunks:
+                urls_unindexed_chunks.append(url)
     
-    if unindexed_chunks_list:
-        logger.warning(f"Writing {len(unindexed_chunks_list)} unindexed chunks to file: {unindexed_chunks_file}")
+    if urls_unindexed_chunks:
+        logger.warning(f"Writing {len(urls_unindexed_chunks)} urls with unindexed chunks to file: {unindexed_chunks_file}")
         try:
             with open(unindexed_chunks_file, 'w') as file:
-                json.dump(unindexed_chunks_list, file)
+                json.dump(urls_unindexed_chunks, file)
         except json.JSONDecodeError as e:
             logger.error(f"Error writing unindexed chunks to file: {e}")
 

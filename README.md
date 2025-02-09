@@ -7,23 +7,26 @@
     - All web pages can be indexed now. The problem with the 23 documents was automatically solved after changing the code.
     - Removed non-English content.
     - Used LLM to decide if the title or the first paragraph should be the question.
+- Knowledge base index:
+    - Added custom identifier for each document (url + chunk id).
+    - I keep track of the domains from which the URLs come (helpful for the final presentation).
+    - Used crawl4ai for scraping the content of non_pdfs.
+- RAG pipeline:
+- Evaluation:
+    - Looked into alpha-NDCG. Cannot implement it without further discussions.
 
 
 ## Pending Taks:
 - QA index:
     - Take the answer and ask an LLM to formulate a question for it and store this question in a separate field.
-    - Compute text analytics.
 - Knowledge base:
-    - Add explicit ID for each document.
-    - Keep track of the domains from which the URLs come (helpful for the final presentation).
-    - Compute text analytics.
     - Analyse the linked PDFs to see how many include tabular data. This then determines if the conversion to markdown using MarkItDown is justified. See if LlamaParse  can convert to MarkDown while also preserving text hierarchy.
     - If the web page/PDF has some internal hierarchy, then keep it (store for each chunk of a paragraph the corresponding section title; this is helpful for a preliminary filtering stage when given a query).
     - Experiment with different LangChain text splitters (LangChain Text Splitters).
     - Since the content of most linked web pages is from the legal domain, try using a legal domain embedding model.
     - Reindex the documents after applying the above changes.
 
-- Explore crawl4ai. 
+- Compute text analytics.
 - upload presentation on Gitlab in a separate folder.
 - update the remote repository.
 - Look into papers regarding diversified question/text generation and see what metrics they use.
@@ -68,37 +71,6 @@ NOTES FOR SCRAPING EXTERNAL DOCS:
 - Beware of the PDFs.
 - First do not take care of text hierarchy.
 
-PLAN: ✅ or ❌
-- create a .json file containing all external links. ✅
-- analyse the existing links and create special cases if needed:
-    1. group urls according to domains and count them. ✅
-    2. delete all mailto urls and #_msocom_1". ✅
-    3. deleted duplicates. ✅
-    4. eliminate Youtube url. ✅
-    5. separate the pdfs from the rest. ✅
-    NOTE: URLs that end with .pdf are not necessarily pdfs.
-    There are 134 pdfs, 1651 non-pdfs and 359 urls which lead to errors (the ones below were eliminated). The following urls were problematic.
-        5.1 The following pages could not be found:
-        - http://eacea.ec.europa.eu/bilateral_cooperation/index_en.php
-        - http://eacea.ec.europa.eu/erasmus_mundus/
-        - http://eacea.ec.europa.eu/tempus/
-        Eliminated those urls. ✅
-        5.2 The following urls cannot be accessed:
-        - http://www.elections2014.eu/en/.
-        - http://www.elections2014.eu/en/in-the-member-states.
-        - http://www.elections2014.eu/en/in-the-member-states/european-union.
-        - http://www.elections2014.eu/en/new-commission/hearings/by-committee.
-        - http://www.elections2014.eu/en/new-commission/portfolios-and-candidates.
-        - http://www.elections2014.eu/en/new-parliament.
-        - http://www.elections2014.eu/en/news-room/content/20140918IFG65303/html/Infographic-how-the-European-Commission-will-get-elected.
-        - http://www.elections2014.eu/en/press-kit/content/20131112PKH24411/html/Overview-of-Parliament-and-the-2014-elections.
-        - https://europa.eu/eyd2015/
-        Eliminated those urls.✅
-        5.3 Insecure:
-        - https://www.avrupa.info.tr/en
-        Eliminated url.✅
-       
-- create a mapping for the Opensearch index of the knowledge base.
 NOTE: adjust the embedding dimension if necessary
 
 - experiment with multiple retrieval strategies and possibly multiple embedding models and configurations

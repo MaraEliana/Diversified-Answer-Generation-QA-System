@@ -9,7 +9,7 @@ from markitdown import MarkItDown
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from opensearchpy import OpenSearch
 from utils import create_opensearch_client, create_index
-from index_pages import split_text_with_langchain, embed_text_with_ollama, index_embeddings, load_configuration
+from index_non_pdfs import split_text_with_langchain, embed_text_with_ollama, index_embeddings, load_configuration
 
 # config files
 CONFIG_FILE = "configurations.json"
