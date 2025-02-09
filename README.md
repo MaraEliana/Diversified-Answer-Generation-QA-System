@@ -20,7 +20,7 @@
 - QA index:
     - Take the answer and ask an LLM to formulate a question for it and store this question in a separate field.
 - Knowledge base:
-    - Analyse the linked PDFs to see how many include tabular data. This then determines if the conversion to markdown using MarkItDown is justified. See if LlamaParse  can convert to MarkDown while also preserving text hierarchy.
+    - Analyse the linked PDFs to see how many include tabular data. This then determines if the conversion to markdown using MarkItDown is justified. See if LlamaParse can convert to MarkDown while also preserving text hierarchy.
     - If the web page/PDF has some internal hierarchy, then keep it (store for each chunk of a paragraph the corresponding section title; this is helpful for a preliminary filtering stage when given a query).
     - Experiment with different LangChain text splitters (LangChain Text Splitters).
     - Since the content of most linked web pages is from the legal domain, try using a legal domain embedding model.
@@ -80,3 +80,4 @@ NOTE: adjust the embedding dimension if necessary
 - compare and improve.
 
 -Crawl4AI does not support pdfs
+unstructured-client==0.27.0

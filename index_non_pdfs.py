@@ -111,8 +111,8 @@ def embed_text_with_ollama(embedding_model, chunks):
             embeddings.append(None)
     return embeddings
 
-def embed_text_with_openai(chunks):
-    pass
+def embed_text_with_openai(embedding_model, chunks):
+    logger.info(f"Embedding {len(chunks)} chunks with OpenAI's embedding model: {embedding_model}")
 
 # index embeddings in OpenSearch
 def index_embeddings(index_name, chunks, embeddings, url):
@@ -160,9 +160,9 @@ def process_urls(index_name, urls, text_splitter, embedding_model):
     for url in tqdm(urls):
         logger.info(f"Processing URL: {url}")
         # basic scraping
-        # text = scrape_text(url)
+        text = scrape_text(url)
         # advanced scraping with crawl4ai
-        text = asyncio.run(scrape_text_with_crawl4ai(url))
+        # text = asyncio.run(scrape_text_with_crawl4ai(url))
         if text:
             chunks = split_text_with_langchain(text, text_splitter)
             embeddings = embed_text_with_ollama(embedding_model, chunks)
