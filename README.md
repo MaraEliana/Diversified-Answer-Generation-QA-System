@@ -11,6 +11,8 @@
     - Added custom identifier for each document (url + chunk id).
     - I keep track of the domains from which the URLs come (helpful for the final presentation).
     - Used crawl4ai for scraping the content of non_pdfs.
+    - Analysed pdf urls and determined that MarkItDown seems a good fit given that most pdfs have tabular data.
+    - Indexed all non-pdf documents.
 - RAG pipeline:
 - Evaluation:
     - Looked into alpha-NDCG. Cannot implement it without further discussions.
@@ -19,13 +21,6 @@
 ## Pending Taks:
 - QA index:
     - Take the answer and ask an LLM to formulate a question for it and store this question in a separate field.
-- Knowledge base:
-    - Analyse the linked PDFs to see how many include tabular data. This then determines if the conversion to markdown using MarkItDown is justified. See if LlamaParse can convert to MarkDown while also preserving text hierarchy.
-    - If the web page/PDF has some internal hierarchy, then keep it (store for each chunk of a paragraph the corresponding section title; this is helpful for a preliminary filtering stage when given a query).
-    - Experiment with different LangChain text splitters (LangChain Text Splitters).
-    - Since the content of most linked web pages is from the legal domain, try using a legal domain embedding model.
-    - Reindex the documents after applying the above changes.
-
 - Compute text analytics.
 - upload presentation on Gitlab in a separate folder.
 - update the remote repository.
@@ -80,4 +75,24 @@ NOTE: adjust the embedding dimension if necessary
 - compare and improve.
 
 -Crawl4AI does not support pdfs
-unstructured-client==0.27.0
+
+# NOTE:
+- Current index for knowledge-base is: "eur-lex-diversified-knowledge-base-2"
+- Text splitter: RecursiveCharacterTextSplitter with chunk_size=6000 characters and chunk_overlap=200 characters.
+- Embedding model: "text-embedding-3-small" with embedding dimension 1536.
+- Total cost for embedding: 0.3$ for the non-pdf documents.
+- Mention that 99% of the documents could be indexed before an error occurred. Say what that error means and how I was able to fix it.
+
+# Reasons for selecting the above:
+- for the text splitter
+- for the chunk size
+- for scraping strategy
+- why not use a free embedding model? what are the disadvantages?
+
+# Good data for presentation
+- Indexing non-pdf documents: start: 13:32:02,346 - end: 15:25:13,766 (for 99% of the urls), start: 17:43:03,185 - end: 17:43:56,806 (for the last 20 urls)
+- There are 11417 documents from non-pdf urls.
+- Indexing pdf documents: start: 19:02:55,085 - end: 19:35:24,141, start: 20:05:11,074 - end: 20:10:02,596
+- There are 3497 documents from pdf urls.
+- There are 135 pdf urls. 87 of them contain tables.
+- Now the final knowledge base has 14914 documents.

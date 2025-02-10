@@ -28,7 +28,8 @@ def create_opensearch_client(host='opensearch-ds-2.ifi.uni-heidelberg.de', port=
         use_ssl=True,
         verify_certs=True,
         assert_hostname=False,
-        ssl_show_warn=False
+        ssl_show_warn=False,
+        timeout=30,  # Increase timeout to 30 seconds or as needed
     )
     return client
 
