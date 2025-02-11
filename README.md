@@ -77,10 +77,10 @@ NOTE: adjust the embedding dimension if necessary
 -Crawl4AI does not support pdfs
 
 # NOTE:
-- Current index for knowledge-base is: "eur-lex-diversified-knowledge-base-2"
+- Current index for knowledge-base is: "eur-lex-diversified-knowledge-base-3" (vector search does not work on 2)
 - Text splitter: RecursiveCharacterTextSplitter with chunk_size=6000 characters and chunk_overlap=200 characters.
 - Embedding model: "text-embedding-3-small" with embedding dimension 1536.
-- Total cost for embedding: 0.3$ for the non-pdf documents.
+- Total cost for embedding all documents: 0.44$.
 - Mention that 99% of the documents could be indexed before an error occurred. Say what that error means and how I was able to fix it.
 
 # Reasons for selecting the above:
