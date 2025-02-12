@@ -14,8 +14,12 @@
     - Analysed pdf urls and determined that MarkItDown seems a good fit given that most pdfs have tabular data.
     - Indexed all non-pdf documents.
 - RAG pipeline:
+    - completed the simple pipeline.
 - Evaluation:
     - Looked into alpha-NDCG. Cannot implement it without further discussions.
+    - Implemented RAGAS for evaluation, but it has unexpected errors.
+    - Switched to deepeval.
+    - First results for 50 samples of the evaluation dataset.
 
 
 ## Pending Taks:

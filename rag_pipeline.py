@@ -3,11 +3,12 @@ import logging
 from langchain_community.llms import Ollama
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
-from langchain_openai import OpenAIEmbeddings, OpenAI
+from langchain_openai import OpenAIEmbeddings, OpenAI, ChatOpenAI
 from langchain_community.vectorstores import OpenSearchVectorSearch
 from dotenv import load_dotenv
 from opensearchpy import RequestsHttpConnection
 import os
+import json
 from utils import create_opensearch_client
 
 LOG_FILE = "rag.log"
@@ -28,7 +29,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def create_simple_retriever(index_name, opensearch_url, k=50):
+def create_simple_retriever(index_name, opensearch_url, k=5):
     """
     Create a simple retriever using OpenSearch as the vector store.
     :param index_name: The name of the OpenSearch index to use for retrieval.
@@ -47,7 +48,7 @@ def create_simple_retriever(index_name, opensearch_url, k=50):
         verify_certs=True,
         connection_class=RequestsHttpConnection
     )
-    return vector_store
+    return vector_store.as_retriever(search_type="similarity", search_kwargs={"k": k, "vector_field": "embedding"})
 
 def create_mmr_retriever(index_name, opensearch_client, k=50, lambda_mmr=0.5):
     """
@@ -55,69 +56,39 @@ def create_mmr_retriever(index_name, opensearch_client, k=50, lambda_mmr=0.5):
     :param index_name: The name of the OpenSearch index to use for retrieval.
     :param k: The number of documents to retrieve.
     """
-    # Initialize OpenAI embeddings with the provided API key
-    embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key, model="text-embedding-3-small")
-
-    # Create the OpenSearch vector store with the embeddings
-    vector_store = OpenSearchVectorSearch(
-        client=opensearch_client,
-        index_name=index_name,
-        embedding_function=embeddings.embed_query,  # Use embeddings to process queries
-    )
-
-    # Set up the MMR retriever with the OpenSearch vector store
-    mmr_retriever = MMRRetriever(
-        vector_store=vector_store,
-        k=k,  # Number of documents to retrieve
-        lambda_mmr=lambda_mmr  # Diversity parameter
-    )
-    
-    return mmr_retriever
+    pass
 
 
 def generate_ollama(question, retriever):
-    prompt_template = """Question: {question}
-    The following documents provide relevant information: {context}
-    Please answer the question, but make sure to provide a diversified response that covers different perspectives and details from the provided documents. Your answer should include multiple viewpoints and insights from the context, not just a single perspective. If necessary, highlight different interpretations, opinions, or additional context that is relevant to the question.
-    Answer the question comprehensively, using the information from the documents provided.
-    """
-    prompt = PromptTemplate(input_variables=["question", "context"], template=prompt_template)
-    ollama.pull("llama3.3")
-    llm = Ollama(model="llama3.3")
-
-    # initialize the chain for retrieving and answering
-    retrieval_qa = RetrievalQA.from_chain_type(
-        llm=llm, retriever=retriever, chain_type="stuff", return_source_documents=True
-    )
-
-    # run the chain to get the response
-    result = retrieval_qa({"query": question})
-    return result['result'] #, result['source_documents']
+    pass
 
 def generate_openai(question, retriever, model="gpt-3.5-turbo"):
-    prompt_template = """Question: {question}
-    The following documents provide relevant information: {context}
-    Please answer the question, but make sure to provide a diversified response that covers different perspectives and details from the provided documents. Your answer should include multiple viewpoints and insights from the context, not just a single perspective. If necessary, highlight different interpretations, opinions, or additional context that is relevant to the question.
-    Answer the question comprehensively, using the information from the documents provided.
-    """
+    prompt_template = PromptTemplate(
+        input_variables=["context", "question"],
+        template="""
+        Question: {question}
+        The following documents provide relevant information: {context}
+        Please answer the question only by using the provided information. Make sure to provide a diversified response that covers different perspectives and details from the provided documents. Your answer should include multiple viewpoints and insights from the context, not just a single perspective. If necessary, highlight different interpretations, opinions, or additional context that is relevant to the question.
+        Answer the question comprehensively, using the information from the documents provided.
+        """
+    )
     
-    # Define the prompt template with placeholders for the question and context
-    prompt = PromptTemplate(input_variables=["question", "context"], template=prompt_template)
-    
-    # Initialize the OpenAI model (replace 'gpt-3.5-turbo' with your desired model)
-    llm = OpenAI(openai_api_key=openai_api_key, model=model)
-    
-    # Initialize the chain for retrieving and answering
-    retrieval_qa = RetrievalQA.from_chain_type(
-        llm=llm, retriever=retriever, chain_type="stuff", return_source_documents=True
+    llm = ChatOpenAI(openai_api_key = openai_api_key, model=model)
+
+    qa_chain = RetrievalQA.from_chain_type(
+        llm=llm,
+        chain_type="stuff",
+        retriever=retriever,
+        return_source_documents=True,
+        chain_type_kwargs={"prompt": prompt_template},
+        verbose=True
     )
 
-    # Run the chain to get the response
-    result = retrieval_qa({"query": question})
+    response = qa_chain.invoke({"query": question})
     
-    return result['result']
+    return response
 
-def load_questions_and_answers_from_opensearch(qa_index_name, opensearch_client, size=1):
+def load_questions_and_answers_from_opensearch(qa_index_name, opensearch_client, size=1000):
     query = {
         "query": {
             "match_all": {}
@@ -135,45 +106,55 @@ def load_questions_and_answers_from_opensearch(qa_index_name, opensearch_client,
     
     return questions_and_answers
 
+
+def format_ground_truth(answer_dict):
+    """Concatenates key-value pairs from a dictionary into a single string."""
+    return " ".join(f"{k} {v}" for k, v in answer_dict.items())
+
+
 if __name__ == "__main__":
-    # initialize OpenSearch client
     opensearch_client = create_opensearch_client(username=opensearch_user, password=opensearch_password)
     opensearch_url = "https://opensearch-ds-2.ifi.uni-heidelberg.de:443"
 
-    kb_index_name = "eur-lex-diversified-knowledge-base-2"
+    kb_index_name = "eur-lex-diversified-knowledge-base-3"
     qa_index_name = "eur-lex-diversified-qa-askep"
     k = 3
     lambda_mmr = 0.5
-    nr_questions = 3
-    model = "gpt-4-turbo"
+    nr_questions = 1000
+    model = "gpt-4o-mini"
+    output_dir = "qa_results_simple_retriever"
 
     # create a retriever
-    # FIRST ATTEMPT: Simple retriever
+    # FIRST SCENARIO: Simple retriever
     logger.info("Creating simple retriever...")
     simple_retriever = create_simple_retriever(kb_index_name, opensearch_url, k=k)
     logger.info("Simple retriever created.")
-
-    # SECOND ATTEMPT: MMR retriever
-    # mmr_retriever = create_mmr_retriever(kb_index_name, opensearch_client, k=k, lambda_mmr=lambda_mmr)
 
     # load questions and ground truth answers from OpenSearch
     logger.info("Loading questions and answers from OpenSearch...")
     questions_and_answers = load_questions_and_answers_from_opensearch(qa_index_name, opensearch_client, size=nr_questions)
     logger.info("Questions and answers loaded.")
     
-    for question, ground_truth_answer in questions_and_answers:
-        docs = simple_retriever.similarity_search(query=question, k=k, vector_field="embedding")
-        for doc in docs:
-            print(doc)
-        # print(f"Question: {question}")
-        # print("Ground Truth Answer:")
-        # for key, value in ground_truth_answer.items():
-        #     print(f"{key} /n, {value}")
+    results = []
+    for i, (question, ground_truth_answer) in enumerate(questions_and_answers):
+        logger.info(f"Processing question {i+1}...")
+        # generate an answer using the simple retriever
+        response = generate_openai(question, simple_retriever, model=model)
+        # retrieve the source documents and the generated answer
+        retrieved_docs = [doc.page_content for doc in response["source_documents"]]
+        generated_answer = response["result"]
+        # format the ground truth answer
+        formatted_ground_truth = format_ground_truth(ground_truth_answer)
+        # Save each QA pair to a JSON file
+        output_file = os.path.join(output_dir, f"qa_pair_{i+1}.json")
+        logger.info(f"Saving QA pair to {output_file}...")
+        with open(output_file, "w") as f:
+            json.dump({
+                "question": question,
+                "ground_truth_answer": formatted_ground_truth,
+                "retrieved_documents": retrieved_docs,
+                "generated_answer": generated_answer
+            }, f, indent=4)
 
-        # # query the retriever and generate the answer
-        # # answer = generate_ollama(question, simple_retriever)
-        # logger.info("Generating answer...")
-        # answer = generate_openai(question, simple_retriever, model=model)
-        
-        # print(f"Generated Answer: {answer}")
-        # print("=" * 50)
+    logger.info("All questions processed.")
+       
