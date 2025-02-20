@@ -4,6 +4,15 @@ This repository contains the code and results of the Master Practical "Data Scie
 
 Author: Mara-Eliana Popescu
 
+### Setup
+
+To set up the Conda environment for this project, run the following commands in your terminal:
+
+```sh
+conda env create -f environment.yml
+conda activate qa_system
+```
+
 ## Table of Contents
 - [Introduction](#introduction)
 - [Project Structure](#project-structure)
@@ -47,7 +56,8 @@ Key objectives of this project include:
 The dataset consists of blog posts from [Ask EP](https://epthinktank.eu/author/epanswers/), where European citizens pose questions on various topics such as climate policies, elections, healthcare, etc. and the European Parliament responds. These posts provide structured answers covering multiple viewpoints, making them suitable for a diversified QA dataset.
 
 <p align="center">
-  <img src="./images/ask_ep.png" alt="Example Blog Post" width="50%">
+  <img src="./images/ask_ep.png" alt="Example Blog Post" width="80%">
+  <p><em>Source: <a href="https://epthinktank.eu/2024/06/28/regulating-social-media-what-is-the-european-union-doing-to-protect-social-media-users/">Ask EP: Regulating social media: What is the European Union doing to protect social media users?</a></em></p>
 </p>
 
 #### Data Processing and Storage
