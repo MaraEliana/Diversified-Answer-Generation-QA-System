@@ -25,7 +25,7 @@ def is_pdf(url):
         if first_bytes.startswith(b'%PDF'):
             return True
 
-        return False  # Not a PDF if neither MIME nor magic number matches
+        return False
 
     except requests.exceptions.RequestException as e:
         print(f"HTTP error for URL: {url} | Error: {e}")

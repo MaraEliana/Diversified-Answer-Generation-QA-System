@@ -3,3 +3,5 @@
 .env
 __pycache__/
 /pages/
+/qa_results_mmr_retriever/
+/qa_results_simple_retriever/

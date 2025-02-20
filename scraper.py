@@ -4,7 +4,6 @@ import json
 import os
 import logging
 import requests
-import unicodedata
 from openai import OpenAI
 from langdetect import detect
 from bs4 import BeautifulSoup
@@ -38,6 +37,11 @@ def normalize_text(text):
 
 
 def scrape_blog_urls(page_number):
+    """
+    Scrape the blog URLs from a given page number.
+    :param page_number: Page number to scrape.
+    :return: List of URLs found on the page.
+    """
     url = BASE_URL.format(page_number)
     logger.info(f"Requesting page {page_number} from {url}")
     response = requests.get(url)
@@ -112,6 +116,13 @@ def extract_new_urls(client, index_name, logger=None):
 
 
 def decide_question(title, paragraph, logger):
+    """
+    Use OpenAI's Chat API to decide whether the title or the paragraph is better suited as a question.
+    :param title: Title of the page.
+    :param paragraph: First paragraph of the page.
+    :param logger: Logger object for logging messages.
+    :return: 'title' if the title is better, 'paragraph' if the paragraph is better, or None if an error occurred.
+    """
     client = OpenAI(api_key=os.environ['OPENAI_API_KEY'])
     prompt = (
         "I have a title and a paragraph. Assess which is better suited as a question.\n"
@@ -138,20 +149,18 @@ def parse_page(url, logger):
     :return: Dictionary containing the extracted data.
     """
     
-    # Get the page content
+    # get the page content
     response = requests.get(url)
     response.encoding = response.apparent_encoding or 'utf-8'
     response.raise_for_status()
-    
-    # Use BeautifulSoup to parse the HTML
     soup = BeautifulSoup(response.content, 'html.parser')
 
-    # Extract the title (from the <title> tag)
+    # extract the title (from the <title> tag)
     title_text = normalize_text(soup.title.string.strip() if soup.title else "No title found")
     if title_text == "No title found":
         logger.warning("Title not found")
 
-    # Extract the content div using lxml for precise XPath targeting
+    # extract the content div using lxml for precise XPath targeting
     tree = html.fromstring(response.content.decode('utf-8', errors='replace'))
     content_xpath = '/html/body/div[5]/article/div/div/div[1]/div[3]'
     content_div = tree.xpath(content_xpath)
@@ -159,7 +168,7 @@ def parse_page(url, logger):
         logger.warning("Content div not found")
     content_div = content_div[0]
 
-    # Extract the question field (first paragraph in content div, using the provided XPath)
+    # extract the question field (first paragraph in content div, using the provided XPath)
     first_paragraph_xpath = '/html/body/div[5]/article/div/div/div[1]/div[1]/p'
     first_paragraph = tree.xpath(first_paragraph_xpath)
     first_paragraph = normalize_text(first_paragraph[0].text_content().strip() if first_paragraph else "No introductory paragraph found.")
@@ -171,46 +180,41 @@ def parse_page(url, logger):
         logger.info("Paragraph chosen as the question")
         question = first_paragraph
 
-
-    # Extract all section titles (h2, h3, strong)
-    section_titles = content_div.xpath(".//h2 | .//h3")
-
     # Create the answer as a dictionary
     answer = {}
-
     current_title = title_text
     section_content = []
 
-    # Iterate over all elements in content_div, including paragraphs, h2, h3, strong, etc.
-    for element in content_div.iter():  # iter() iterates over all child elements of content_div
-        # If the element is a section title (h2, h3, or strong), this marks the start of a new section
+    # iterate over all elements in content_div, including paragraphs, h2, h3, strong, etc.
+    for element in content_div.iter():
+        # if the element is a section title (h2, h3), this marks the start of a new section
         if element.tag in ['h2', 'h3']:
-            # If we're already collecting content for a section, store the content for the previous section
+            # if we're already collecting content for a section, store the content for the previous section
             if section_content:
                 answer[current_title] = " ".join(section_content)
-            # Set the new section title as the current title
+            # set the new section title as the current title
             current_title = normalize_text(element.text_content().strip())
-            # Reset the section content to start collecting content for the new section
+            # reset the section content to start collecting content for the new section
             section_content = []
-        # If the element is a paragraph or list, add its content to the current section's content
+        # if the element is a paragraph or list, add its content to the current section's content
         elif element.tag in ['p', 'ul', 'ol']:
             section_content.append(normalize_text(element.text_content().strip()))
 
-    # After the loop, make sure to store the last section's content
+    # store the last section's content
     if section_content:
         answer[current_title] = " ".join(section_content)
 
-    # Iterate over the answer keys and remove key-value pairs which are not in English
+    # iterate over the answer keys and remove key-value pairs which are not in English
     multilingual = False
     for key in list(answer.keys()):
         if detect(answer[key]) != "en":
             multilingual = True
             del answer[key]
 
-    # Extract links from the content
+    # extract links from the content
     links = [a.get("href") for a in content_div.xpath(".//p//a[@href]")]
     
-    # Extract tags and their URLs from the specified tags section
+    # extract tags and their URLs from the specified tags section
     tags_xpath = '/html/body/div[5]/article/div/div/div[1]/div[5]'
     tags_div = tree.xpath(tags_xpath)
     if tags_div:
@@ -220,7 +224,6 @@ def parse_page(url, logger):
         tags, tag_urls = [], []
 
     # Return the extracted page data
-    # change the multiple_languages field
     page_data = {
         "html": response.text,
         "url": url,
@@ -276,9 +279,6 @@ if __name__ == "__main__":
     # create an index for the list of urls if it doesn't exist
     url_index = "eur-lex-diversified-urls-askep"
     url_mapping = load_mapping("./mappings/urls_mapping.json")
-    ### DELETE THIS
-    opensearch_client.indices.delete(index=url_index)
-    ###
     create_index(opensearch_client, url_index, url_mapping, logger)
 
     # extract the new URLs
@@ -288,9 +288,6 @@ if __name__ == "__main__":
         # save the new URLs to the QA index in OpenSearch
         qa_index = "eur-lex-diversified-qa-askep"
         qa_mapping = load_mapping("./mappings/qa_mapping.json")
-        ### DELETE THIS
-        opensearch_client.indices.delete(index=qa_index)
-        ###
         # create the QA index if it doesn't exist
         create_index(opensearch_client, qa_index, qa_mapping, logger)
         # parse the new URLs and save the structured data to the QA index

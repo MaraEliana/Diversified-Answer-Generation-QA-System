@@ -50,7 +50,6 @@ if __name__ == "__main__":
     llm = ChatOpenAI(model="gpt-4o")
     embeddings = OpenAIEmbeddings(openai_api_key= openai_api_key, model="text-embedding-3-small")
     evaluator_llm = LangchainLLMWrapper(llm)
-    # , FactualCorrectness(), ResponseRelevancy()
     result = evaluate(dataset=evaluation_dataset, embeddings=embeddings, metrics=[LLMContextPrecisionWithReference(), LLMContextRecall(), Faithfulness()], llm=evaluator_llm, run_config=run_config)
     print(result)
     print("✅ Evaluation results saved.")

@@ -1,18 +1,18 @@
-from crawl4ai import AsyncWebCrawler
-import asyncio
-from langchain.text_splitter import SentenceTransformersTokenTextSplitter, RecursiveCharacterTextSplitter
-import tiktoken
-from openai import OpenAI
-import requests
-from bs4 import BeautifulSoup
 import json
+import os
+from dotenv import load_dotenv
 from tqdm import tqdm
 import logging
+import asyncio
+import tiktoken
+from openai import OpenAI
+from crawl4ai import AsyncWebCrawler
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 LOG_FILE = "index_pages.log"
-client = OpenAI(
-    api_key="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",  # This is the default and can be omitted
-)
+load_dotenv()
+openai_api_key = os.getenv('OPENAI_API_KEY')
+client = OpenAI(api_key=openai_api_key)
 # initialize logging
 logging.basicConfig(
     level=logging.INFO,
@@ -23,22 +23,8 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
-
-def scrape_text(url):
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        
-        # Parse the HTML content
-        soup = BeautifulSoup(response.text, "html.parser")
-        
-        # Extract and return the raw text (without tags)
-        raw_text = soup.get_text(separator="\n")  # Use newline separator for better readability
-        return raw_text.strip()  # Remove leading/trailing whitespace
-    
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error scraping URL {url}: {e}")
-        return None
+# Initialize tokenizer for OpenAI's model (cl100k_base)
+tokenizer = tiktoken.get_encoding("cl100k_base")
 
 async def scrape_text_with_crawl4ai(url):
     async with AsyncWebCrawler(verbose=True) as crawler:
@@ -60,9 +46,6 @@ def embed_text_chunks(chunks, model="text-embedding-3-small"):
         embeddings.append(client.embeddings.create(input = [chunk], model=model).data[0].embedding)
     return embeddings
 
-# Initialize tokenizer for OpenAI's model (cl100k_base)
-tokenizer = tiktoken.get_encoding("cl100k_base")
-
 # Function to count tokens in a text
 def count_tokens(text):
     return len(tokenizer.encode(text))
@@ -82,12 +65,9 @@ def read_urls_from_file(file_path):
 async def main():
     URLS_FILE = "non_pdf_urls.json"
     urls = read_urls_from_file(URLS_FILE)
-    urls = urls[:5]
+    urls = urls[:10]
     for url in tqdm(urls):
             logger.info(f"Processing URL: {url}")
-            # basic
-            # text = scrape_text(url)
-            # advanced
             text = await scrape_text_with_crawl4ai(url)
             logger.info(f"Raw text from url {url}: {text}\n\n")
             if text:
@@ -100,4 +80,5 @@ async def main():
                 logger.info(f"Number of embeddings: {len(embeddings)}\n")
 
 if __name__ == "__main__":
+    # test crawl4ai
     asyncio.run(main())

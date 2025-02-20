@@ -16,7 +16,6 @@ from crawl4ai import AsyncWebCrawler
 import asyncio
 
 # config files
-CONFIG_FILE = "configurations.json"
 URLS_FILE = "non_pdf_urls.json"
 LOG_FILE = "non_pdfs.log"
 
@@ -41,35 +40,23 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# load configuration if needed
-def load_configuration(config_name):
-    logger.info(f"Loading configuration: {config_name}")
-    try:
-        with open(CONFIG_FILE, 'r') as file:
-            configs = json.load(file)
-            if config_name in configs:
-                return configs[config_name]
-            else:
-                raise ValueError(f"Configuration '{config_name}' not found in {CONFIG_FILE}")
-    except FileNotFoundError as e:
-        logger.error(f"Configuration file not found: {e}")
-        return None
-    except json.JSONDecodeError as e:
-        logger.error(f"Error decoding configuration file: {e}")
-        return None
-
 def scrape_text(url):
+    """
+    Scrapes the text content from a URL.
+    :param url: URL to scrape.
+    :return: Cleaned text content.
+    """
     try:
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         
-        # Parse the HTML content
+        # parse the HTML content
         soup = BeautifulSoup(response.text, "html.parser")
         
-        # Extract raw text
+        # extract raw text
         raw_text = soup.get_text(separator="\n")
         
-        # Remove empty lines and strip extra whitespace
+        # remove empty lines and strip extra whitespace
         clean_text = "\n".join(line.strip() for line in raw_text.splitlines() if line.strip())
         
         return clean_text
@@ -79,32 +66,51 @@ def scrape_text(url):
         return None
     
 async def scrape_text_with_crawl4ai(url):
+    """
+    Scrapes the text content from a URL using Crawl4AI.
+    :param url: URL to scrape.
+    :return: Cleaned text content.
+    """
     async with AsyncWebCrawler(verbose=True) as crawler:
         result = await crawler.arun(url=url)
         return result.markdown
 
 def split_text_with_char_splitter(text, max_chars=6000):
-    # Initialize the text splitter with a character chunk size
+    """
+    Splits the text into chunks using RecursiveCharacterTextSplitter.
+    :param text: Text content to split.
+    :param max_chars: Maximum number of characters per chunk.
+    :return: List of text chunks.
+    """
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=max_chars,  # Max number of characters per chunk
-        chunk_overlap=200,  # Number of characters to overlap between chunks
+        chunk_size=max_chars,
+        chunk_overlap=200, 
         length_function=len
     )
     return splitter.split_text(text)
 
 def calculate_tokens_for_chunks(chunks):
-    # Initialize the tokenizer
+    """
+    Calculates the total number of tokens required to encode the text chunks.
+    :param chunks: List of text chunks.
+    :return: Total number of tokens required.
+    """
     enc = tiktoken.get_encoding("cl100k_base")
     
     total_tokens = 0
     for chunk in chunks:
-        # Encode the chunk to get the tokens and count them
-        total_tokens += len(enc.encode(chunk))  # Encoding chunk and getting number of tokens
+        # encode the chunk to get the tokens and count them
+        total_tokens += len(enc.encode(chunk))
     
     return total_tokens
 
-# embed text chunks using Ollama
 def embed_text_with_ollama(embedding_model, chunks):
+    """
+    Embeds the text chunks using the Ollama model.
+    :param embedding_model: Ollama embedding model to use.
+    :param chunks: List of text chunks to embed.
+    :return: List of embeddings corresponding to the text chunks.
+    """
     logger.info(f"Embedding {len(chunks)} chunks with Ollama model: {embedding_model}")
     embeddings = []
     for i, chunk in enumerate(chunks):
@@ -120,13 +126,19 @@ def embed_text_with_ollama(embedding_model, chunks):
     return embeddings
 
 def embed_text_with_openai(chunks, model="text-embedding-3-small"):
+    """
+    Embeds the text chunks using the OpenAI model.
+    :param chunks: List of text chunks to embed.
+    :param model: OpenAI embedding model to use.
+    :return: List of embeddings corresponding to the text chunks.
+    """
     logger.info(f"Embedding {len(chunks)} chunks with OpenAI's embedding model: {model}")
     embeddings = []
     for chunk in chunks:
         embeddings.append(client.embeddings.create(input = [chunk], model=model).data[0].embedding)
     return embeddings
 
-# index embeddings in OpenSearch
+
 def index_embeddings(index_name, chunks, embeddings, url, opensearch_client, logger):
     """
     Embeds and indexes the text chunks in OpenSearch.
@@ -154,7 +166,6 @@ def index_embeddings(index_name, chunks, embeddings, url, opensearch_client, log
     return has_unindexed_chunks
 
 
-# read URLs from the JSON file
 def read_urls_from_file(file_path):
     logger.info(f"Reading URLs from file: {file_path}")
     try:
@@ -167,9 +178,13 @@ def read_urls_from_file(file_path):
         return []
 
 
-# Token tracking function to handle rate-limiting
 def check_and_throttle(tokens_to_add, token_data):
-    # Ensure token count stays within limits
+    """
+    Checks the token count and throttles if the limit is approaching.
+    :param tokens_to_add: Number of tokens to add.
+    :param token_data: Dictionary containing token tracking data.
+    """
+    # ensure token count stays within limits
     if token_data['total_tokens_used'] + tokens_to_add > TOKEN_LIMIT_PER_MINUTE:
         current_time = time.time()
         elapsed_time = current_time - token_data['last_reset_time']
@@ -178,54 +193,56 @@ def check_and_throttle(tokens_to_add, token_data):
             print(f"Rate limit approaching, waiting for {time_to_wait:.2f} seconds.")
             time.sleep(time_to_wait)  # Sleep until the rate limit resets
         
-        # Reset the token counter after waiting
+        # reset the token counter after waiting
         token_data['total_tokens_used'] = 0
         token_data['last_reset_time'] = time.time()
 
-    # Update token count
+    # update token count
     token_data['total_tokens_used'] += tokens_to_add
 
-# process URLs
 def process_urls(index_name, urls, embedding_model="text-embedding-3-small"):
+    """
+    Processes the list of URLs by scraping, splitting, embedding, and indexing the text content.
+    :param index_name: Name of the OpenSearch index.
+    :param urls: List of URLs to process.
+    :param embedding_model: OpenAI embedding model to use.
+    """
     urls_unindexed_chunks = []
     unindexed_chunks_file = "unindexed_chunks.json"
     
-    # Token tracking data
+    # token tracking data
     token_data = {'total_tokens_used': 0, 'last_reset_time': time.time()}
 
     for url in tqdm(urls):
         logger.info(f"Processing URL: {url}")
         
-        # Scraping text
+        # scraping text
         text = scrape_text(url)  
         if text:
-            # Use RecursiveCharacterTextSplitter to split the text into chunks
+            # split the text into chunks
             chunks = split_text_with_char_splitter(text)
-            
-            # Calculate the number of tokens for these chunks
+            # calculate the number of tokens for these chunks
             tokens_needed = calculate_tokens_for_chunks(chunks)
-            
-            # Check and throttle if we exceed the token limit
+            # check and throttle if we exceed the token limit
             check_and_throttle(tokens_needed, token_data)
             
             try:
-                # Embed the text chunks using the OpenAI model
-                embeddings = embed_text_with_openai(chunks)
+                embeddings = embed_text_with_openai(chunks, embedding_model)
             except APIError as e:
-                # Catch errors related to insufficient balance or any other API errors
+                # errors related to insufficient balance or any other API errors
                 if "insufficient balance" in str(e).lower():
                     logger.error("Insufficient balance for OpenAI embedding. Stopping further requests. Exact error: {e}")
                     break  # Stop processing further if balance is insufficient
                 else:
                     logger.error(f"Error embedding text with OpenAI API: {e}")
-                    continue  # Continue with the next URL
+                    continue
 
-            # Index the embeddings
+            # index the embeddings
             has_unindexed_chunks = index_embeddings(index_name, chunks, embeddings, url)
             if has_unindexed_chunks:
                 urls_unindexed_chunks.append(url)
     
-    # Write the unindexed URLs to a file if there are any
+    # write the unindexed URLs to a file if there are any
     if urls_unindexed_chunks:
         logger.warning(f"Writing {len(urls_unindexed_chunks)} urls with unindexed chunks to file: {unindexed_chunks_file}")
         try:
@@ -239,18 +256,12 @@ if __name__ == "__main__":
     if urls:
         logger.info("Starting URL processing pipeline")
         has_config = False
-        # use the second index
-        index_name = "eur-lex-diversified-knowledge-base-2"
+        index_name = "eur-lex-diversified-knowledge-base-3"
         if has_config:
-            # load specific configuration
-            # CONFIG MODEL: ChunkSize-ChunkOverlap-TextSplitter-EmbeddingModel
-            config_name = "CS400-CO50-Recursive-MXBAI"
-            config = load_configuration(config_name)
-            # extract configuration values
-            chunk_size = config.get("ChunkSize")
-            chunk_overlap = config.get("ChunkOverlap")
-            text_splitter_name = config.get("TextSplitter")
-            embedding_model = config.get("EmbeddingModel")
+            chunk_size = 400
+            chunk_overlap = 50
+            text_splitter_name = "RecursiveCharacterTextSplitter"
+            embedding_model = "mxbai-embed-large"
             if embedding_model == "mxbai-embed-large":
                 ollama.pull("mxbai-embed-large")
                 embedding_dim = 1024
