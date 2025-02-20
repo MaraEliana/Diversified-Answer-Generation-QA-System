@@ -23,6 +23,21 @@ Key objectives of this project include:
 - Evaluating the system, with a focus on diversification.
 
 ## Project Structure
+| **Category**          | **File Name**               | **Purpose / Description**                      |
+|------------------|------------------------|--------------------------------------------|
+| **Data Collection** | `scraper.py`           | Loads, processes and stores urls and qa dataset           |
+|                  | `scrape_external_links.py`| Collects a list of all external urls    |
+|                  | `clean_external_links.py` | Cleans the list of external urls           |
+|                  | `analyse.ipynb`           |   Analysis of domain distribution and separation of urls   |
+|                  | `utils.py`               | Contains OpenSearch utility functions                                          |
+|                  |  `index_non_pdfs.py`     | Scrapes, processes and stores webpages for knowledge base|
+|                  |  `index_pdfs.py`         | Scrapes, processes and stores pdfs for knowledge base|
+|                  |  `test_crawl4ai.py`      | Tests the scraping capabilities of Crawl4AI|
+| **RAG Pipeline** | `rag_pipeline.py`         | Constructs a full RAG system             |
+|                  | `reindex.ipynb`           | Reindices documents for vector search and tests similarity search  |
+| **Evaluation**   | `compute_diversity_metric.ipynb`| Implements $\alpha$-nDCG |
+|                  | `deep_eval.ipynb`         | Evaluates classic metrics using DeepEval  |
+|                  |  `evaluate_ragas.py`      | Evaluates classic metrics using RAGAS  |
 
 
 ## Data Collection
@@ -188,7 +203,7 @@ Below is an example showcasing a ground truth question along with the correspond
 
 One of the key challenges in evaluating our RAG pipeline is the absence of standardized metrics for measuring diversification. Existing evaluation frameworks such as **RAGAS** and **DeepEval** do not explicitly assess diversification in retrieval or generation.
 
-To address this gap, we explored **alpha-nDCG**, a metric that evaluates document relevance for multiple intents associated with a query. Since available implementations of alpha-nDCG are limited and often lack clear usage guidelines, we implemented our own version by referencing the original paper and its description in the the Encyclopedia of Database Systems (Alessio et al., 2024; Carbonell & Goldstein, 1998; Sakai, 2018).
+To address this gap, we explored **alpha-nDCG**, a metric that evaluates document relevance for multiple intents associated with a query. Since available implementations of alpha-nDCG are limited and often lack clear usage guidelines, we implemented our own version by referencing the original paper and its description in the the Encyclopedia of Database Systems (Clarke et al., 2008; Sakai, 2018).
 
 α-nDCG is a variant of Normalized Discounted Cumulative Gain (nDCG) designed for evaluating diversified search results. It assumes that a query $q$ can have multiple possible intents $i$ with known per-intent relevance assessments. Given a ranked list, let $I_i(r) = 1$ if the document at rank $r$ is relevant to intent $i$, and $ I_i(r) = 0 $ otherwise. Define the cumulative count of relevant documents for intent $ i $ at rank $ r $ as:
 
