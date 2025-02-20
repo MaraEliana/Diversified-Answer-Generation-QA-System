@@ -56,7 +56,7 @@ Key objectives of this project include:
 The dataset consists of blog posts from [Ask EP](https://epthinktank.eu/author/epanswers/), where European citizens pose questions on various topics such as climate policies, elections, healthcare, etc. and the European Parliament responds. These posts provide structured answers covering multiple viewpoints, making them suitable for a diversified QA dataset.
 
 <p align="center">
-  <img src="./images/ask_ep.png" alt="Example Blog Post" width="80%">
+  <img src="./images/ask_ep.png" alt="Example Blog Post" width="70%">
   <p><em>Source: <a href="https://epthinktank.eu/2024/06/28/regulating-social-media-what-is-the-european-union-doing-to-protect-social-media-users/">Ask EP: Regulating social media: What is the European Union doing to protect social media users?</a></em></p>
 </p>
 
@@ -213,7 +213,7 @@ Below is an example showcasing a ground truth question along with the correspond
 
 One of the key challenges in evaluating our RAG pipeline is the absence of standardized metrics for measuring diversification. Existing evaluation frameworks such as **RAGAS** and **DeepEval** do not explicitly assess diversification in retrieval or generation.
 
-To address this gap, we explored **alpha-nDCG**, a metric that evaluates document relevance for multiple intents associated with a query. Since available implementations of alpha-nDCG are limited and often lack clear usage guidelines, we implemented our own version by referencing the original paper and its description in the the Encyclopedia of Database Systems (Clarke et al., 2008; Sakai, 2018).
+To address this gap, we explored **alpha-nDCG**, a metric that evaluates document relevance for multiple intents associated with a query. Since available implementations of alpha-nDCG are limited and often lack clear usage guidelines, we implemented our own version by referencing the original paper and its description in the Encyclopedia of Database Systems (Clarke et al., 2008; Sakai, 2018).
 
 α-nDCG is a variant of Normalized Discounted Cumulative Gain (nDCG) designed for evaluating diversified search results. It assumes that a query $q$ can have multiple possible intents $i$ with known per-intent relevance assessments. Given a ranked list, let $I_i(r) = 1$ if the document at rank $r$ is relevant to intent $i$, and $ I_i(r) = 0 $ otherwise. Define the cumulative count of relevant documents for intent $ i $ at rank $ r $ as:
 
