@@ -32,13 +32,21 @@ OPENAI_API_KEY = "your_openai_key"
 - [References](#references)
 
 ## Introduction
-Traditional Question Answering (QA) systems aim to provide highly precise responses, often yielding a single correct answer. However, in many domains, questions can have multiple valid perspectives and require diversified answers, covering several topics and viewpoints. The goal of this project was to develop a QA system capable of generating diversified answers by leveraging a Retrieval-Augmented Generation (RAG) pipeline.
 
-Key objectives of this project include:
+Traditional Question Answering (QA) systems aim to provide highly precise responses, often yielding a single correct answer. However, in many domains, questions can have multiple valid perspectives and require diversified answers that cover various topics and viewpoints rather than a single definitive response. This is particularly relevant in open-ended or subjective queries, where different aspects of a topic contribute to a more comprehensive understanding.
+
+To address this challenge, this project focuses on developing a QA system capable of generating diversified answers by leveraging a Retrieval-Augmented Generation (RAG) pipeline. **Diversification** in retrieval systems can be formally defined as the process of optimizing retrieved results to maximize coverage across distinct aspects, topics, or viewpoints relevant to a given query, rather than reinforcing a single dominant perspective. This definition aligns with our goal of producing QA outputs that are not only accurate but also contextually rich and representative of multiple perspectives.
+
+A crucial aspect of this project is the dataset used to assess the system's capability to generate diversified answers. The primary dataset consists of blog posts from Ask EP, which provide a strong example of diversified QA pairs. Unlike traditional QA datasets that map each question to a single correct answer, Ask EP responses tend to explore multiple angles, offering nuanced perspectives that make them particularly well-suited for studying diversification in answer generation. By analyzing how language models interact with such data, we can assess whether they tend to focus on a single topic or viewpoint or if they are capable of constructing a panoramic response covering a broad range of relevant information.
+
+The ability to generate diversified answers is critical in domains such as legal advice, policy discussions, and scientific discourse, where presenting multiple perspectives enhances decision-making. The objectives of this project include:
+
 - Creating a custom diversified QA dataset.
 - Building a knowledge base to support diversified answer generation.
 - Implementing a RAG pipeline for diversified QA.
 - Evaluating the system, with a focus on diversification.
+
+By improving diversification in answer generation, this project contributes to the broader goal of making QA systems more informative, balanced, and context-aware.
 
 ## Project Structure
 | **Category**          | **File Name**               | **Purpose / Description**                      |
