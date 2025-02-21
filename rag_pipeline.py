@@ -220,7 +220,7 @@ if __name__ == "__main__":
     nr_questions = 1000
     model = "gpt-4o-mini"
     output_dir = "qa_results_mmr_retriever"
-    method = "mmr"
+    method = "mmr" # "simple" or "mmr"
 
     # FIRST SCENARIO: Simple retriever
     logger.info("Creating simple retriever...")

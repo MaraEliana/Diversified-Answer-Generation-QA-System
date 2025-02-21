@@ -25,6 +25,7 @@ OPENAI_API_KEY = "your_openai_key"
 ## Table of Contents
 - [Introduction](#introduction)
 - [Project Structure](#project-structure)
+- [Code Base Information](#code-base-information)
 - [Data Collection](#data-collection)
 - [RAG System](#rag-system)
 - [RAG Evaluation](#rag-evaluation)
@@ -54,7 +55,7 @@ By improving diversification in answer generation, this project contributes to t
 | **Data Collection** | `scraper.py`           | Loads, processes and stores urls and qa dataset           |
 |                  | `scrape_external_links.py`| Collects a list of all external urls    |
 |                  | `clean_external_links.py` | Cleans the list of external urls           |
-|                  | `analyse.ipynb`           |   Analysis of domain distribution and separation of urls   |
+|                  | `analyse.ipynb`           |   Analysis of domain distribution|
 |                  | `utils.py`               | Contains OpenSearch utility functions                                          |
 |                  |  `index_non_pdfs.py`     | Scrapes, processes and stores webpages for knowledge base|
 |                  |  `index_pdfs.py`         | Scrapes, processes and stores pdfs for knowledge base|
@@ -64,6 +65,23 @@ By improving diversification in answer generation, this project contributes to t
 | **Evaluation**   | `compute_diversity_metric.ipynb`| Implements $\alpha$-nDCG |
 |                  | `deep_eval.ipynb`         | Evaluates classic metrics using DeepEval  |
 |                  |  `evaluate_ragas.py`      | Evaluates classic metrics using RAGAS  |
+
+
+## **Code Base Information**  
+
+The workflow is divided into three main phases: **data collection and preprocessing**, **RAG pipeline implementation**, and **evaluation**.
+
+### **1. Data Collection and Preprocessing**  
+
+The data collection process starts by running `scraper.py`, which scrapes URLs and blog posts, ensuring that the newest pages are stored locally in the `pages/` folder as well as in the OpenSearch indices. After scraping, `scrape_external_links.py` is executed to collect a complete list of external links from the dataset. Once external links have been gathered, `clean_external_links.py` is run to generate two separate lists: one for PDF URLs and another for non-PDF URLs. These filtered lists are then used to update the knowledge base. `index_non_pdfs.py` is executed to process and store non-PDF web pages, followed by `index_pdfs.py`, which handles the indexing of PDF documents. Once these steps are completed, the knowledge base is fully updated with the latest data, making it ready for retrieval and answer generation.
+
+### **2. RAG Pipeline Implementation**  
+
+To generate answers, `rag_pipeline.py` is executed. This script retrieves relevant documents from the knowledge base and generates responses to questions from the ground truth dataset. The retrieval method must be specified in the script before execution, with options including **mmr (Maximal Marginal Relevance)** for diverse retrieval and **simple** for standard nearest-neighbor search. Each QA pair, along with the generated response and the retrieved documents, is stored locally in a structured format. If the dataset grows too large over time, storing results locally may become inefficient, and a transition to OpenSearch for result storage would be necessary. The `reindex.ipynb` file was primarily used for reindexing and testing and does not need to be executed as part of the pipeline.
+
+### **3. Evaluation**  
+
+For evaluating the system's performance using classic QA metrics, `deep_eval.ipynb` should be run. This assumes that the evaluation data is already stored locally. To test the partial implementation of the **α-nDCG** metric for diversification evaluation, `compute_diversity_metric.ipynb` can be executed. Additionally, evaluation using the RAGAS framework is possible with `evaluate_ragas.py`, though it is known to occasionally encounter timeout errors.
 
 
 ## Data Collection
