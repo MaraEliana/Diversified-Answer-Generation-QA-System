@@ -1,0 +1,6 @@
+# Opensearch Connection Details
+OPENSEARCH_USER = "your_opensearch_username"
+OPENSEARCH_PASSWORD = "your_opensearch_password"
+
+# OpenAI
+OPENAI_API_KEY = "your_openai_key"

@@ -13,6 +13,15 @@ conda env create -f environment.yml
 conda activate qa_system
 ```
 
+Rename the .env-example to .env and populate the file with the required credentials:
+```sh
+# Opensearch Connection Details
+OPENSEARCH_USER = "your_opensearch_username"
+OPENSEARCH_PASSWORD = "your_opensearch_password"
+# OpenAI
+OPENAI_API_KEY = "your_openai_key"
+```
+
 ## Table of Contents
 - [Introduction](#introduction)
 - [Project Structure](#project-structure)
