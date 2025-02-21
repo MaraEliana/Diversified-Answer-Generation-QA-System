@@ -40,7 +40,7 @@ To address this challenge, this project focuses on developing a QA system capabl
 
 A crucial aspect of this project is the dataset used to assess the system's capability to generate diversified answers. The primary dataset consists of blog posts from Ask EP, which provide a strong example of diversified QA pairs. Unlike traditional QA datasets that map each question to a single correct answer, Ask EP responses tend to explore multiple angles, offering nuanced perspectives that make them particularly well-suited for studying diversification in answer generation. By analyzing how language models interact with such data, we can assess whether they tend to focus on a single topic or viewpoint or if they are capable of constructing a panoramic response covering a broad range of relevant information.
 
-The ability to generate diversified answers is critical in domains such as legal advice, policy discussions, and scientific discourse, where presenting multiple perspectives enhances decision-making. The objectives of this project include:
+The ability to generate diversified answers is critical in domains such as legal advice, policy discussions, and scientific discourse, where presenting multiple perspectives enhances decision-making. We set out with the following objectives:
 
 - Creating a custom diversified QA dataset.
 - Building a knowledge base to support diversified answer generation.
